@@ -1152,6 +1152,14 @@ The **Pending NOTE.md confirmation** bucket — six items at v0.2.0 — is now e
 
 The largest remaining bucket is **Deferred to v0.4.x or later** — these will surface again during ARCHITECTURE.md drafting and worked-example construction, where downstream commitments may force resolution.
 
+### Post-v0.3.0 evidence (v0.1.0 kernel)
+
+The `clinlat` substrate kernel (v0.1.0) provides downstream evidence supporting two open questions:
+
+- **OQ-MP-02 (Result vs Outcome naming)**: The kernel implements `Outcome<H, A>` rather than `Result⟨H, R⟩`, confirming the collision with Rust's `Result<T, E>` is real and justifies the rename. The clinlat API successfully avoids ambiguity using the `Outcome` nomenclature. _Partial closure:_ the rename is validated; full closure awaits v0.3.x if ecosystem confusion is observed (see OQ-MP-02 disposition).
+
+- **OQ-X-03 (Informal-argument discharge)**: The SOFA-3 respiratory operator (`clinlat::sofa::SofaRespOperator`) carries a soundness argument in `clinlat/docs/operators/sofa_resp_soundness.md` discharging OBL-PS-03's "informal-argument" tier. The argument (a) states the three soundness clauses from DEF-PS-08, (b) argues each for the SOFA-3 operator, and (c) cites clinical references. This is the form OQ-X-03 describes: "a one-paragraph English justification for each operator's soundness." _Partial closure:_ one worked example of informal-argument discharge is now present; the mechanism remains unresolved and the gap between English argument and behavior is named but not closed (as per OQ-X-03's v0.x disposition).
+
 ---
 
 _End of §7._
