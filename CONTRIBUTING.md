@@ -33,6 +33,7 @@ pre-commit install
 ```
 
 **Hooks include:**
+
 - **Standard:** Trailing whitespace, end-of-file fixers, YAML/JSON/TOML validation, merge conflict detection, private key detection
 - **Markdown:** Linting with `markdownlint`
 - **Rust:** `cargo fmt`, `cargo clippy -- -D warnings`, `cargo check`

@@ -380,7 +380,7 @@ Every `δ_i ∈ Δ_PS` satisfies DEF-PS-08. No operator may enter `Δ_PS` withou
 
 The patient-substrate abstention type is a sum:
 
-`AbstainReason_PS = `
+`AbstainReason_PS =`
 `InsufficientEvidence(missing: Set⟨RequiredObservation⟩)`
 `| OutOfDistribution(detail: OodReport)`
 `| AmbiguousRefinement(candidates: Set⟨Hyp⟩, rationale: Prov)`
@@ -588,7 +588,7 @@ The _institutional operator set_ is a finite, named, versioned set `Δ_IS = {(na
 
 **DEF-IS-10 (Institutional abstention reason).** [formalizes: `NOTE.md` §4B.3]
 
-`AbstainReason_IS = `
+`AbstainReason_IS =`
 `CapacityExceeded(resource: R, demand: ℕ, available: ℕ)`
 `| DemandUncertain(forecast_ci: ConfidenceInterval, threshold_breached: ThresholdId)`
 `| AllocationContested(stakeholders: Set⟨StakeholderId⟩, rationale: Prov)`
@@ -675,7 +675,7 @@ This is the section where the residual originality claim from `NOTE.md` §6 — 
 
 A _cross-layer event_ is a tagged value:
 
-`CrossLayerEvent = `
+`CrossLayerEvent =`
 `PatientToInstitutional(p_evidence: Evidence, derived: AllocationImpact)`
 `| InstitutionalToPatient(i_evidence: InstEvidence, derived: PatientImpact)`
 `| Coupled(p_evidence: Evidence, i_evidence: InstEvidence, link: CouplingId)`
@@ -770,7 +770,7 @@ The most committal section of SPEC.md v0.1.0-draft. This formalizes the property
 
 **DEF-IX-08 (Joint abstention reason).** [formalizes: `NOTE.md` §4C.3]
 
-`AbstainReason_J = `
+`AbstainReason_J =`
 `PatientOnly(r_PS: AbstainReason_PS)`
 `| InstitutionalOnly(r_IS: AbstainReason_IS)`
 `| Divergent(diff: SubstrateDiff)`

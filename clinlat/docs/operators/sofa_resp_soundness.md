@@ -4,6 +4,7 @@
 **Scope:** Informal-argument tier per OBL-PS-03
 **Date:** 2026-05-25
 **References:**
+
 - Vincent JL, et al. The SOFA (Sepsis-related Organ Failure Assessment) score to describe organ dysfunction/failure. Intensive Care Med. 1996;22(7):707–710.
 - Singer M, et al. The Third International Consensus Definitions for Sepsis and Septic Shock (Sepsis-3). JAMA. 2016;315(8):801–810.
 
@@ -22,6 +23,7 @@ This operator maps arterial oxygen partial pressure (PaO₂) and fraction of ins
 In v0.1.0, the operator takes a unit `Evidence` type and does not use the input hypothesis h. The operator's output is determined entirely by the evidence (PaO₂, FiO₂, mechanical ventilation status) and the SOFA threshold table, which is fixed.
 
 For any hypotheses h₁, h₂, and evidence e:
+
 - If the operator produces `Refined(score)` on (h₁, e), it produces the same `Refined(score)` on (h₂, e).
 - If the operator produces `Abstain(reason)` on (h₁, e), it produces the same `Abstain(reason)` on (h₂, e).
 
@@ -36,6 +38,7 @@ Therefore, the operator is **hypothesis-independent** in v0.1.0 and trivially sa
 **Argument:**
 
 The SOFA-3 respiratory component uses a deterministic threshold table:
+
 - PaO₂/FiO₂ ≥ 400 mmHg → score 0 (no respiratory dysfunction)
 - 300–399 mmHg → score 1
 - 200–299 mmHg → score 2

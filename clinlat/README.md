@@ -2,7 +2,7 @@
 
 A Rust substrate for symbolic clinical decision-making based on refinable hypothesis lattices and sound deduction operators.
 
-**Version:** 0.1.0  
+**Version:** 0.1.0
 **Status:** Early implementation (kernel milestone)
 
 ## Overview
@@ -98,6 +98,7 @@ Hypotheses are ordered by refinement:
 ```
 
 In this lattice:
+
 - **Unknown** is the greatest element (least specific; no information).
 - **Score{N}** elements are minimal (each is a specific diagnostic score).
 - The **partial meet** of two elements is their greatest lower bound (if it exists).
@@ -111,6 +112,7 @@ apply: (Hyp, Evidence) → Outcome<Hyp, AbstainReason>
 ```
 
 The operator either:
+
 - **Refines** the hypothesis to a more specific one based on evidence.
 - **Abstains** with a reason (e.g., insufficient evidence, precondition unmet).
 
@@ -187,4 +189,4 @@ Contributions follow the repository contribution order (see [`CONTRIBUTING.md`](
 2. Demonstrate one of the eighteen principles is wrong or unnecessary.
 3. Show the substrate framing fails on a clinical decision not covered by the worked examples.
 
-For questions or issues, see the main repository: https://github.com/SHA888/SFClinAI
+For questions or issues, see the main repository: <https://github.com/SHA888/SFClinAI>

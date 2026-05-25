@@ -62,7 +62,7 @@ The composite is positioned as a route from UNDCS-class to CCS-class under the T
 
 Please cite the specific version and date accessed, and treat as a working draft:
 
-> Sucandra, K. (2026). _Substrate-First Clinical AI: A Position Note_ (v0.12.0-draft) [Working draft]. https://github.com/SHA888/SFClinAI
+> Sucandra, K. (2026). _Substrate-First Clinical AI: A Position Note_ (v0.12.0-draft) [Working draft]. <https://github.com/SHA888/SFClinAI>
 
 Author byline: **Kresna Sucandra, MD**. The note's header asks that the draft not be cited as a settled position; if citation is unavoidable, cite as a working draft.
 

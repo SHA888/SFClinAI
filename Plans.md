@@ -1,7 +1,7 @@
 # SFClinAI — Plans.md
 
-**Project:** clinlat substrate kernel v0.1.0  
-**Created:** 2026-05-25  
+**Project:** clinlat substrate kernel v0.1.0
+**Created:** 2026-05-25
 **Scope:** Rust implementation; out-of-scope items tracked in NOTE.md §7 and SPEC.md §7.
 
 ---
@@ -101,7 +101,7 @@ claude
 /harness-work 0.1
 ```
 
-**Suitable for:**  
+**Suitable for:**
 Phase 0 is a half-day of setup; starting with task 0.1 gives repo structure before diving into core types (Phase 1).
 
 Alternatively, to batch all four phases after repo setup:

@@ -412,47 +412,47 @@ Disagreements that arrive after this draft is timestamped and become the next ve
 
 ## References
 
-Davis L, Haller L, Alfarano A, Santolucito M. *Lattice Deduction Transformers*. arXiv:2605.08605 [cs.LG], 9 May 2026. https://arxiv.org/abs/2605.08605
+Davis L, Haller L, Alfarano A, Santolucito M. *Lattice Deduction Transformers*. arXiv:2605.08605 [cs.LG], 9 May 2026. <https://arxiv.org/abs/2605.08605>
 
-Nakajima T. *MedBeads: An Agent-Native, Immutable Data Substrate for Trustworthy Medical AI*. arXiv:2602.01086 [cs.AI], 1 Feb 2026. https://arxiv.org/abs/2602.01086
+Nakajima T. *MedBeads: An Agent-Native, Immutable Data Substrate for Trustworthy Medical AI*. arXiv:2602.01086 [cs.AI], 1 Feb 2026. <https://arxiv.org/abs/2602.01086>
 
-Chavda R, Suresh K, Kumar S, et al. *A bidirectional neuro-symbolic framework for clinical decision support via dynamic integration of deep learning and symbolic reasoning*. Network Modeling Analysis in Health Informatics and Bioinformatics 15, 79 (2026). https://doi.org/10.1007/s13721-025-00710-2
+Chavda R, Suresh K, Kumar S, et al. *A bidirectional neuro-symbolic framework for clinical decision support via dynamic integration of deep learning and symbolic reasoning*. Network Modeling Analysis in Health Informatics and Bioinformatics 15, 79 (2026). <https://doi.org/10.1007/s13721-025-00710-2>
 
-Dang X, Chen K, Su X, Noori A, Arango I, Vittor L, Long X, Du Y, Zitnik M, Heng PA. *KnowGuard: Knowledge-Driven Abstention for Multi-Round Clinical Reasoning*. arXiv:2509.24816 [cs.CL], 29 Sep 2025. Accepted at ICLR 2026. https://arxiv.org/abs/2509.24816
+Dang X, Chen K, Su X, Noori A, Arango I, Vittor L, Long X, Du Y, Zitnik M, Heng PA. *KnowGuard: Knowledge-Driven Abstention for Multi-Round Clinical Reasoning*. arXiv:2509.24816 [cs.CL], 29 Sep 2025. Accepted at ICLR 2026. <https://arxiv.org/abs/2509.24816>
 
-Machcha S, Yerra S, Gupta S, Sahoo A, Sultana S, Yu H, Yao Z. *Knowing When to Abstain: Medical LLMs Under Clinical Uncertainty* (introducing the MedAbstain benchmark). arXiv:2601.12471 [cs.CL], 18 Jan 2026 (v1); 22 Jan 2026 (v2). https://arxiv.org/abs/2601.12471
+Machcha S, Yerra S, Gupta S, Sahoo A, Sultana S, Yu H, Yao Z. *Knowing When to Abstain: Medical LLMs Under Clinical Uncertainty* (introducing the MedAbstain benchmark). arXiv:2601.12471 [cs.CL], 18 Jan 2026 (v1); 22 Jan 2026 (v2). <https://arxiv.org/abs/2601.12471>
 
-Tanwisuth S, Leja DK. *Uncertainty-Aware Policy-Preserving Abstractions with Abstention for One-Shot Decisions*. MATS Research, 23 Apr 2026. https://www.matsprogram.org/research/uncertainty-aware-policy-preserving-abstractions-with-abstention-for-one-shot-decisions
+Tanwisuth S, Leja DK. *Uncertainty-Aware Policy-Preserving Abstractions with Abstention for One-Shot Decisions*. MATS Research, 23 Apr 2026. <https://www.matsprogram.org/research/uncertainty-aware-policy-preserving-abstractions-with-abstention-for-one-shot-decisions>
 
-Prenosil GA, Weitzel TK, Bello SC, Mingels C, Manzini G, Meier LP, Shi KY, Rominger A, Afshar-Oromieh A. *Neuro-symbolic AI for auditable cognitive information extraction from medical reports* (introducing the RUDS system). Communications Medicine (Nature portfolio) 5:491, 21 Nov 2025. https://doi.org/10.1038/s43856-025-01194-x
+Prenosil GA, Weitzel TK, Bello SC, Mingels C, Manzini G, Meier LP, Shi KY, Rominger A, Afshar-Oromieh A. *Neuro-symbolic AI for auditable cognitive information extraction from medical reports* (introducing the RUDS system). Communications Medicine (Nature portfolio) 5:491, 21 Nov 2025. <https://doi.org/10.1038/s43856-025-01194-x>
 
-Gu Q, Singh A, Singh G. *Cost-Driven Synthesis of Sound Abstract Interpreters*. arXiv:2511.13663 [cs.PL; cs.LG], 17 Nov 2025. https://arxiv.org/abs/2511.13663
+Gu Q, Singh A, Singh G. *Cost-Driven Synthesis of Sound Abstract Interpreters*. arXiv:2511.13663 [cs.PL; cs.LG], 17 Nov 2025. <https://arxiv.org/abs/2511.13663>
 
-Ingram M, Merritt AJ III. *A Neural Affinity Framework for Abstract Reasoning: Diagnosing the Compositional Gap in Transformer Architectures via Procedural Task Taxonomy*. arXiv:2512.07109, 8 Dec 2025. https://arxiv.org/abs/2512.07109
+Ingram M, Merritt AJ III. *A Neural Affinity Framework for Abstract Reasoning: Diagnosing the Compositional Gap in Transformer Architectures via Procedural Task Taxonomy*. arXiv:2512.07109, 8 Dec 2025. <https://arxiv.org/abs/2512.07109>
 
-Jahn F, Muskalla Y, Dargasz L, Schramowski P, Baum K. *Breaking Up with Normatively Monolithic Agency with GRACE: A Reason-Based Neuro-Symbolic Architecture for Safe and Ethical AI Alignment*. arXiv:2601.10520 (v2), Feb 2026. https://arxiv.org/abs/2601.10520
+Jahn F, Muskalla Y, Dargasz L, Schramowski P, Baum K. *Breaking Up with Normatively Monolithic Agency with GRACE: A Reason-Based Neuro-Symbolic Architecture for Safe and Ethical AI Alignment*. arXiv:2601.10520 (v2), Feb 2026. <https://arxiv.org/abs/2601.10520>
 
-Zhi X, Zhao H, Wu L, Zhao C, Zhu H. *Reinventing Clinical Dialogue: Agentic Paradigms for LLM-Enabled Healthcare Communication*. arXiv:2512.01453, Dec 2025. https://arxiv.org/abs/2512.01453
+Zhi X, Zhao H, Wu L, Zhao C, Zhu H. *Reinventing Clinical Dialogue: Agentic Paradigms for LLM-Enabled Healthcare Communication*. arXiv:2512.01453, Dec 2025. <https://arxiv.org/abs/2512.01453>
 
-Chow JCL, Li K. *From Dialogue Systems to Autonomous Agents: A Modeling Framework for Ethical Generative AI in Healthcare*. Information 17(4):361, April 2026. https://www.mdpi.com/2078-2489/17/4/361
+Chow JCL, Li K. *From Dialogue Systems to Autonomous Agents: A Modeling Framework for Ethical Generative AI in Healthcare*. Information 17(4):361, April 2026. <https://www.mdpi.com/2078-2489/17/4/361>
 
-Tan C, Visva Gunasekeran D, Low CO, Sim GSY, Foo DY, Morris RJT, Wong TY. *Regulation of clinical Artificial Intelligence (AI) in the Age of Agents: Unconfined Non-Deterministic Clinical Software (UNDCS) systems for healthcare*. npj Digital Medicine 9:186, Feb 23, 2026. https://doi.org/10.1038/s41746-026-02420-z
+Tan C, Visva Gunasekeran D, Low CO, Sim GSY, Foo DY, Morris RJT, Wong TY. *Regulation of clinical Artificial Intelligence (AI) in the Age of Agents: Unconfined Non-Deterministic Clinical Software (UNDCS) systems for healthcare*. npj Digital Medicine 9:186, Feb 23, 2026. <https://doi.org/10.1038/s41746-026-02420-z>
 
-Microsoft (Siddique I, Principal Group Engineering Manager). *Introducing the Agent Governance Toolkit: Open-source runtime security for AI agents*. Microsoft Open Source Blog, April 2, 2026. MIT licensed. https://opensource.microsoft.com/blog/2026/04/02/introducing-the-agent-governance-toolkit-open-source-runtime-security-for-ai-agents/ | Source: https://github.com/microsoft/agent-governance-toolkit
+Microsoft (Siddique I, Principal Group Engineering Manager). *Introducing the Agent Governance Toolkit: Open-source runtime security for AI agents*. Microsoft Open Source Blog, April 2, 2026. MIT licensed. <https://opensource.microsoft.com/blog/2026/04/02/introducing-the-agent-governance-toolkit-open-source-runtime-security-for-ai-agents/> | Source: <https://github.com/microsoft/agent-governance-toolkit>
 
-Ferzana R. *Beyond Accuracy: A Decision-Theoretic Framework for Allocation-Aware Healthcare AI*. arXiv:2601.06161, 6 Jan 2026. AIiH 2026 Imperial College London. https://arxiv.org/abs/2601.06161
+Ferzana R. *Beyond Accuracy: A Decision-Theoretic Framework for Allocation-Aware Healthcare AI*. arXiv:2601.06161, 6 Jan 2026. AIiH 2026 Imperial College London. <https://arxiv.org/abs/2601.06161>
 
-Demiray O, Güneş ED, Örmeci L. *Modeling and Optimizing Resource Allocation Decisions through Multi-model Markov Decision Processes with Capacity Constraints*. arXiv:2011.04357. https://arxiv.org/abs/2011.04357
+Demiray O, Güneş ED, Örmeci L. *Modeling and Optimizing Resource Allocation Decisions through Multi-model Markov Decision Processes with Capacity Constraints*. arXiv:2011.04357. <https://arxiv.org/abs/2011.04357>
 
-Chung TH, Rostami V, Bastani H, Bastani O. *Decision-Aware Learning for Optimizing Health Supply Chains*. arXiv:2211.08507. https://arxiv.org/abs/2211.08507
+Chung TH, Rostami V, Bastani H, Bastani O. *Decision-Aware Learning for Optimizing Health Supply Chains*. arXiv:2211.08507. <https://arxiv.org/abs/2211.08507>
 
-Adelman D, Olivares-Nadal AV, Xie M. *Optimizing Treatment Allocation to Maximize the Health of a Population*. arXiv:2604.07738, April 2026. https://arxiv.org/abs/2604.07738
+Adelman D, Olivares-Nadal AV, Xie M. *Optimizing Treatment Allocation to Maximize the Health of a Population*. arXiv:2604.07738, April 2026. <https://arxiv.org/abs/2604.07738>
 
-*Equity-Aware Geospatial AI for Forecasting Demand-Driven Hospital Locations in Germany*. arXiv:2510.10640, October 2025. https://arxiv.org/abs/2510.10640
+*Equity-Aware Geospatial AI for Forecasting Demand-Driven Hospital Locations in Germany*. arXiv:2510.10640, October 2025. <https://arxiv.org/abs/2510.10640>
 
-*Equity at the point of care: auditing AI-supported resource allocation in obstetric emergencies*. Frontiers in Public Health, doi:10.3389/fpubh.2026.1774367, February 2026. https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2026.1774367/full
+*Equity at the point of care: auditing AI-supported resource allocation in obstetric emergencies*. Frontiers in Public Health, doi:10.3389/fpubh.2026.1774367, February 2026. <https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2026.1774367/full>
 
-US Patent 12562280. *Multilingual healthcare system with personalized medical assistant, decision support, and closed-loop device control*. Includes a longitudinal patient-state store, deterministic constraint-grammar FSM, LLM-based medical-assistant engine, regulated alerting subsystem, role-based authorization with dual cryptographic co-signature, immutable audit ledger. Predecessor family: US 10629303, US 11475996, US 11955238 (*Systems and methods for determination of patient true state for personalized medicine*). USPTO public PDF reference: https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/12562280
+US Patent 12562280. *Multilingual healthcare system with personalized medical assistant, decision support, and closed-loop device control*. Includes a longitudinal patient-state store, deterministic constraint-grammar FSM, LLM-based medical-assistant engine, regulated alerting subsystem, role-based authorization with dual cryptographic co-signature, immutable audit ledger. Predecessor family: US 10629303, US 11475996, US 11955238 (*Systems and methods for determination of patient true state for personalized medicine*). USPTO public PDF reference: <https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/12562280>
 
 Rush AJ, Trivedi MH, Wisniewski SR, et al. *Acute and longer-term outcomes in depressed outpatients requiring one or several treatment steps: a STAR*D report*. Am J Psychiatry 2006;163(11):1905–1917. The STAR*D summary publication; reports Level 1 through Level 4 remission rates and the 67% cumulative remission rate that was the basis for treatment-resistant depression management guidance for over a decade.
 
@@ -462,25 +462,25 @@ Prescott HC, Antonelli M, Evans L, et al. *Surviving Sepsis Campaign: Internatio
 
 KDIGO 2024 Clinical Practice Guideline for the Evaluation and Management of Chronic Kidney Disease. *Kidney International* 2024;105(4S):S117–S314. Major update to 2012 CKD guideline; new recommendations on SGLT2 inhibitors, finerenone, GLP-1 receptor agonists, nephrotoxin stewardship, GFR estimation with cystatin C.
 
-KDIGO AKI Guideline Scope of Work (October 2023). https://kdigo.org/wp-content/uploads/2023/10/KDIGO-AKI-Guideline_Scope-of-Work_25Oct2023_Final.pdf. Active revision of the 2012 AKI guideline; expanded framework covering AKI and AKD continuum, biomarker integration, electronic alerts, contrast-associated AKI updates.
+KDIGO AKI Guideline Scope of Work (October 2023). <https://kdigo.org/wp-content/uploads/2023/10/KDIGO-AKI-Guideline_Scope-of-Work_25Oct2023_Final.pdf>. Active revision of the 2012 AKI guideline; expanded framework covering AKI and AKD continuum, biomarker integration, electronic alerts, contrast-associated AKI updates.
 
-HL7 FHIR Clinical Reasoning Module. https://www.hl7.org/fhir/clinicalreasoning-module.html. Provides PlanDefinition, ActivityDefinition, Library, and Measure resources with explicit version, effectivePeriod, and status metadata for computable clinical knowledge artifacts. Sponsored by HL7 Clinical Decision Support and Clinical Quality Information work groups. Origins in CMS/ONC Clinical Quality Framework initiative.
+HL7 FHIR Clinical Reasoning Module. <https://www.hl7.org/fhir/clinicalreasoning-module.html>. Provides PlanDefinition, ActivityDefinition, Library, and Measure resources with explicit version, effectivePeriod, and status metadata for computable clinical knowledge artifacts. Sponsored by HL7 Clinical Decision Support and Clinical Quality Information work groups. Origins in CMS/ONC Clinical Quality Framework initiative.
 
-HL7 Clinical Quality Language Specification, version 1.5.3 (current normative, ANSI Normative Standard) and version 2.0.0-ballot (trial-use ballot). https://cql.hl7.org/. Expression language for clinical quality logic targeting both clinical decision support and clinical quality measurement, designed to be a foundation for representing versioned clinical knowledge.
+HL7 Clinical Quality Language Specification, version 1.5.3 (current normative, ANSI Normative Standard) and version 2.0.0-ballot (trial-use ballot). <https://cql.hl7.org/>. Expression language for clinical quality logic targeting both clinical decision support and clinical quality measurement, designed to be a foundation for representing versioned clinical knowledge.
 
-Cochrane *Guidance for the production and publication of Cochrane living systematic reviews* (December 2019). https://community.cochrane.org/. Formal methodology for LSRs; three criteria for adoption: priority for decision making, low certainty in existing evidence, likely new research evidence. MAGICapp (https://magicapp.org/) is the web-based collaborative publishing platform; Australian Living Evidence Collaboration coordinates living-guideline production across clinical domains.
+Cochrane *Guidance for the production and publication of Cochrane living systematic reviews* (December 2019). <https://community.cochrane.org/>. Formal methodology for LSRs; three criteria for adoption: priority for decision making, low certainty in existing evidence, likely new research evidence. MAGICapp (<https://magicapp.org/>) is the web-based collaborative publishing platform; Australian Living Evidence Collaboration coordinates living-guideline production across clinical domains.
 
 US FDA. *Marketing Submission Recommendations for a Predetermined Change Control Plan for Artificial Intelligence-Enabled Device Software Functions*. Final guidance, December 4, 2024. Statutory authority: Federal Food, Drug, and Cosmetic Act Section 515C. Pre-authorizes specified device modifications without requiring new marketing submissions; uses AI-DSF terminology; allows automatic implementation of modifications with FDA Q-Submission discussion.
 
 US FDA, Health Canada, UK MHRA. *Five Guiding Principles for Predetermined Change Control Plans for Machine Learning-Enabled Medical Devices*. August 2025. Joint multinational principles: Focused, Risk-based, Evidence-based, Transparent, Lifecycle-oriented. Harmonizes regulatory expectations across the three jurisdictions.
 
-European Union. *EU Artificial Intelligence Act, Article 72 — Post-market monitoring by providers and post-market monitoring plan for high-risk AI systems*. https://artificialintelligenceact.eu/article/72/. Requires post-market monitoring system as part of Annex IV technical documentation; Commission implementing-act template due February 2, 2026; outputs feed Article 9 risk management updates and Article 73 serious incident reporting.
+European Union. *EU Artificial Intelligence Act, Article 72 — Post-market monitoring by providers and post-market monitoring plan for high-risk AI systems*. <https://artificialintelligenceact.eu/article/72/>. Requires post-market monitoring system as part of Annex IV technical documentation; Commission implementing-act template due February 2, 2026; outputs feed Article 9 risk management updates and Article 73 serious incident reporting.
 
-Tu T, et al. *Towards Conversational Diagnostic AI* (introducing AMIE). arXiv:2401.05654, Jan 2024. https://arxiv.org/abs/2401.05654
+Tu T, et al. *Towards Conversational Diagnostic AI* (introducing AMIE). arXiv:2401.05654, Jan 2024. <https://arxiv.org/abs/2401.05654>
 
-*Towards Conversational AI for Disease Management* (AMIE disease-management variant). arXiv:2503.06074, March 2026. https://arxiv.org/abs/2503.06074
+*Towards Conversational AI for Disease Management* (AMIE disease-management variant). arXiv:2503.06074, March 2026. <https://arxiv.org/abs/2503.06074>
 
-Cousot P, Cousot R. *Abstract interpretation: a unified lattice model for static analysis of programs by construction or approximation of fixpoints*. In Conference Record of the Fourth Annual ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages (POPL '77), pp. 238–252, 1977. https://doi.org/10.1145/512950.512973
+Cousot P, Cousot R. *Abstract interpretation: a unified lattice model for static analysis of programs by construction or approximation of fixpoints*. In Conference Record of the Fourth Annual ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages (POPL '77), pp. 238–252, 1977. <https://doi.org/10.1145/512950.512973>
 
 Cousot P, Cousot R. *Systematic design of program analysis frameworks*. In Conference Record of the Sixth Annual ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages (POPL '79), pp. 269–282, 1979.
 
