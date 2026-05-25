@@ -1,9 +1,9 @@
 # SPEC.md — Substrate-First Clinical AI: Formalization
 
-**Version:** v0.1.0-draft
+**Version:** v0.2.0-draft
 **Status:** Working draft for scrutiny. Not for citation.
 **License:** CC BY 4.0
-**Companion to:** `NOTE.md` v0.10.1-draft
+**Companion to:** `NOTE.md` v0.11.0-draft
 
 ---
 
@@ -56,7 +56,7 @@ _Rationale._ The Galois-connection structure makes "operator-set changes are sou
 
 where `H` is the hypothesis-space type and `A` is the abstention-reason type (defined per substrate).
 
-_Rationale._ Abstention is a first-class output in `NOTE.md` §4A.4, §4B.4, §4C.3. Encoding it as ⊥ ∈ P collapses two distinct epistemic states ("the data refines to no further hypothesis" vs. "the operator declines to commit") into one. The separate-type encoding makes the distinction enforceable by type-checking and makes the abstention reason part of the audit trail.
+_Rationale._ Abstention is a first-class output in `NOTE.md` §4A.3, §4B.3, §4C.3. Encoding it as ⊥ ∈ P collapses two distinct epistemic states ("the data refines to no further hypothesis" vs. "the operator declines to commit") into one. The separate-type encoding makes the distinction enforceable by type-checking and makes the abstention reason part of the audit trail.
 
 ### §0.4. Notation conventions
 
@@ -136,6 +136,16 @@ Two consequences:
 | §8      | Bidirectional traceability `NOTE.md` ↔ SPEC.md                | Pending                |
 
 Sections are drafted in order. Each substrate section (§2–§5) is iterated to stability before the next begins. §6 and §8 are constructed incrementally as §2–§5 grow.
+
+### §0.9. Criticality scheme
+
+SPEC.md inherits the per-principle criticality scheme introduced in `NOTE.md` v0.11.0 §4. The scheme is summarized here for self-containment; the authoritative definitions live in `NOTE.md`.
+
+- **P (Position-critical)** — violation falsifies a substrate, layer, or coupling claim the position itself depends on.
+- **S (Safety-property)** — violation breaks a stated safety property within an existing substrate.
+- **F (Foundation)** — violation breaks supporting infrastructure other principles depend on.
+
+Each obligation (`OBL-*` in §6) inherits the criticality of the `NOTE.md` §4 principle it most directly supports via its `[formalizes:]` annotation. Where an obligation supports multiple principles, the higher tier (P > S > F) governs. The inheritance is intended to be mechanical: if a `NOTE.md` principle's tier is revised, every SPEC.md obligation traceable to that principle re-inherits the new tier without further commentary.
 
 ---
 
@@ -287,7 +297,7 @@ For compatible `h₁, h₂`, the meet `h₁ ⊓_PS h₂` is the unique (by antis
 
 ### §2.2. Ontology-bounded hypothesis candidates
 
-**DEF-PS-03 (Ontology-bounded set).** [formalizes: `NOTE.md` §4A.3]
+**DEF-PS-03 (Ontology-bounded set).** [formalizes: `NOTE.md` §4A.2]
 
 An _ontology-bounded set_ `O` is a finite or recursively enumerable set equipped with:
 
@@ -297,13 +307,13 @@ An _ontology-bounded set_ `O` is a finite or recursively enumerable set equipped
 
 Concrete ontology bindings — which terminologies, at which versions, with what mappings between them — are out of scope per §0.5. SPEC.md depends only on the abstract `OntologyBoundedSet` interface. ∎
 
-**DEF-PS-04 (Hypothesis candidate constraint).** [formalizes: `NOTE.md` §4A.3]
+**DEF-PS-04 (Hypothesis candidate constraint).** [formalizes: `NOTE.md` §4A.2]
 
 Let `Atom` be an ontology-bounded set of _clinical atoms_ (concept identifiers — diseases, findings, medications, lab observations, anatomical sites). A hypothesis `h ∈ Hyp` is _ontology-bounded_ iff every atomic concept appearing in `h` satisfies `Atom.is_member`.
 
 `Hyp` is constrained so that every `h ∈ Hyp` is ontology-bounded. Hypotheses referencing non-member atoms are not representable in the substrate. ∎
 
-**OBL-PS-01 (Ontology decidability).** [formalizes: `NOTE.md` §4A.3, "no free-form atoms"]
+**OBL-PS-01 (Ontology decidability).** [formalizes: `NOTE.md` §4A.2, "no free-form atoms"]
 
 Membership in `Atom` must be decidable in bounded time. Free-text concepts, ad-hoc strings, and tokens not present in `Atom` cannot enter `Hyp` through any path. This is enforced by parsing-stage validation: any input hypothesis is parsed against `Atom` at construction time and rejected if it fails. ∎
 
@@ -366,7 +376,7 @@ Every `δ_i ∈ Δ_PS` satisfies DEF-PS-08. No operator may enter `Δ_PS` withou
 
 ### §2.5. Abstention semantics
 
-**DEF-PS-10 (Abstention reason).** [formalizes: `NOTE.md` §4A.4]
+**DEF-PS-10 (Abstention reason).** [formalizes: `NOTE.md` §4A.3]
 
 The patient-substrate abstention type is a sum:
 
@@ -379,11 +389,11 @@ The patient-substrate abstention type is a sum:
 
 Each variant carries structured information about _why_ the operator declined to commit. Free-text abstention is not permitted: every abstention is machine-classifiable. ∎
 
-**INV-PS-04 (Abstention is sound).** [formalizes: `NOTE.md` §4A.4]
+**INV-PS-04 (Abstention is sound).** [formalizes: `NOTE.md` §4A.3]
 
 Abstention never violates DEF-PS-08. An operator returning `Abstain(r)` makes no claim about the patient's state, so soundness is trivially preserved. The only soundness-relevant property of abstention is that the reason `r` is well-formed (`r : AbstainReason_PS` and all carried data satisfies its substructure invariants). ∎
 
-**DEF-PS-11 (Abstention is not bottom).** [formalizes: `NOTE.md` §4A.4, "first-class output"]
+**DEF-PS-11 (Abstention is not bottom).** [formalizes: `NOTE.md` §4A.3, "first-class output"]
 
 `Abstain(r)` is _not_ equivalent to any `Refined(h)` for any `h ∈ Hyp`, including a hypothetical bottom `⊥_PS`. The two epistemic states — "no further refinement is supported" and "I decline to refine" — are encoded by distinct constructors of `Result⟨Hyp, AbstainReason_PS⟩` and cannot be conflated.
 
@@ -391,11 +401,11 @@ Abstention never violates DEF-PS-08. An operator returning `Abstain(r)` makes no
 
 ### §2.6. Provenance integration
 
-**DEF-PS-12 (Patient-substrate evidence packet).** [formalizes: `NOTE.md` §4A.5, "auditable provenance"]
+**DEF-PS-12 (Patient-substrate evidence packet).** [formalizes: `NOTE.md` §4A.4, "auditable provenance"]
 
 An _evidence packet_ is `Evidence = Obs^P` (per DEF-MP-15). Every observation entering a deduction operator carries a provenance carrier identifying its source (device, lab system, clinician input, prior operator output). ∎
 
-**DEF-PS-13 (Operator output with provenance).** [formalizes: `NOTE.md` §4A.5]
+**DEF-PS-13 (Operator output with provenance).** [formalizes: `NOTE.md` §4A.4]
 
 A deduction operator's signature is refined from DEF-PS-07 to:
 
@@ -405,11 +415,11 @@ That is, the input hypothesis carries provenance, the evidence carries provenanc
 
 The refined hypothesis's provenance is `(prov_h · prov_e · op_marker)` where `op_marker : Prov` identifies which operator and operator-version produced this refinement. ∎
 
-**INV-PS-05 (Provenance closure).** [formalizes: `NOTE.md` §4A.5]
+**INV-PS-05 (Provenance closure).** [formalizes: `NOTE.md` §4A.4]
 
 Every value in the patient substrate that derives from any operator application carries a provenance composed (via `·`) from the provenances of all inputs and the operator's marker. There is no path by which a value reaches the substrate without provenance: every constructor of `Hyp^P`, `Evidence`, and `Result⟨...⟩^P` requires a `Prov` argument. ∎
 
-**OBL-PS-04 (Provenance auditability).** [formalizes: `NOTE.md` §4A.5]
+**OBL-PS-04 (Provenance auditability).** [formalizes: `NOTE.md` §4A.4]
 
 For any value `v : T^P` in the substrate, the `derives_from` relation (DEF-MP-14) must allow reconstruction of the full derivation chain back to source observations. The substrate must reject any operator whose output provenance fails to satisfy this property. ∎
 
@@ -494,7 +504,7 @@ If `c₁ ⊑_IS c₂` and `compat_IS(c₂, c₃)`, then `compat_IS(c₁, c₃)`.
 
 ### §3.2. Scope-bounded resources and physical capacity bounds
 
-**DEF-IS-03 (Resource-bounded set).** [formalizes: `NOTE.md` §4B.3]
+**DEF-IS-03 (Resource-bounded set).** [formalizes: `NOTE.md` §4B.2]
 
 A _resource-bounded set_ `R` is the institutional analog of the ontology-bounded set (DEF-PS-03). It is an `OntologyBoundedSet`-typed enumeration of:
 
@@ -517,7 +527,7 @@ A capacity hypothesis `c ∈ Cap` is _physically valid_ iff its committed-resour
 
 Every operator in §3.4 must preserve physical validity: applying an operator to a physically-valid input cannot produce a physically-invalid output. Operators that would violate `cap` must abstain (DEF-IS-10). ∎
 
-**OBL-IS-02 (Resource decidability).** [formalizes: `NOTE.md` §4B.3]
+**OBL-IS-02 (Resource decidability).** [formalizes: `NOTE.md` §4B.2]
 
 Membership in `R` is decidable. Free-form resource identifiers cannot enter `Cap`. ∎
 
@@ -576,7 +586,7 @@ The _institutional operator set_ is a finite, named, versioned set `Δ_IS = {(na
 
 ### §3.5. Allocation abstention
 
-**DEF-IS-10 (Institutional abstention reason).** [formalizes: `NOTE.md` §4B.4]
+**DEF-IS-10 (Institutional abstention reason).** [formalizes: `NOTE.md` §4B.3]
 
 `AbstainReason_IS = `
 `CapacityExceeded(resource: R, demand: ℕ, available: ℕ)`
@@ -590,7 +600,7 @@ Mirrors DEF-PS-10 in structure: every abstention is machine-classifiable, no fre
 
 **INV-IS-04 (Institutional abstention is sound).** Mirrors INV-PS-04. ∎
 
-**DEF-IS-11 (Allocation abstention is not stalling).** [formalizes: `NOTE.md` §4B.4, "first-class output"]
+**DEF-IS-11 (Allocation abstention is not stalling).** [formalizes: `NOTE.md` §4B.3, "first-class output"]
 
 `Abstain(r)` for an allocation decision means the substrate has explicitly produced a non-decision, with a machine-readable reason and a provenance trail. It is _not_ the same as the operator timing out, crashing, or silently producing a default allocation. The substrate guarantees that every allocation request yields either `Refined(c')` or `Abstain(r)` in bounded steps — never silent failure. (Bounded-time guarantees themselves are an architectural concern; here we require only that the abstention path is structurally reachable.) ∎
 
@@ -598,15 +608,15 @@ Mirrors DEF-PS-10 in structure: every abstention is machine-classifiable, no fre
 
 The provenance machinery is shared with the patient substrate. Section §2.6 definitions apply with substrate-appropriate type substitutions; only delta-relevant statements appear here.
 
-**DEF-IS-12 (Institutional evidence packet).** Mirrors DEF-PS-12: `InstEvidence = Evt^P`. Every event entering an operator carries provenance. ∎
+**DEF-IS-12 (Institutional evidence packet).** [formalizes: `NOTE.md` §4B.4] Mirrors DEF-PS-12: `InstEvidence = Evt^P`. Every event entering an operator carries provenance. ∎
 
-**DEF-IS-13 (Institutional operator output with provenance).** Mirrors DEF-PS-13:
+**DEF-IS-13 (Institutional operator output with provenance).** [formalizes: `NOTE.md` §4B.4] Mirrors DEF-PS-13:
 
 `δ_IS : Cap^P × InstEvidence → Result⟨Cap^P, AbstainReason_IS⟩^P` ∎
 
-**INV-IS-05 (Institutional provenance closure).** Mirrors INV-PS-05. ∎
+**INV-IS-05 (Institutional provenance closure).** [formalizes: `NOTE.md` §4B.4] Mirrors INV-PS-05. ∎
 
-**OBL-IS-05 (Institutional provenance auditability).** Mirrors OBL-PS-04. ∎
+**OBL-IS-05 (Institutional provenance auditability).** [formalizes: `NOTE.md` §4B.4] Mirrors OBL-PS-04. ∎
 
 ### §3.7. The capacity-learned proposer
 
@@ -661,7 +671,7 @@ This is the section where the residual originality claim from `NOTE.md` §6 — 
 
 ### §4.1. Cross-layer event interface
 
-**DEF-IX-01 (Cross-layer event).** [formalizes: `NOTE.md` §4C.1]
+**DEF-IX-01 (Cross-layer event).** [formalizes: `NOTE.md` §4C.2]
 
 A _cross-layer event_ is a tagged value:
 
@@ -678,7 +688,7 @@ Each variant carries the originating substrate's evidence and a _derivation_ int
 
 `Coupled` carries simultaneously-occurring events that affect both substrates (e.g., an admission event refines both the patient hypothesis and the bed allocation). ∎
 
-**DEF-IX-02 (Allocation impact derivation).** [formalizes: `NOTE.md` §4C.1]
+**DEF-IX-02 (Allocation impact derivation).** [formalizes: `NOTE.md` §4C.2]
 
 For a `PatientToInstitutional` event, the derivation function
 
@@ -688,11 +698,11 @@ maps patient evidence and the current patient hypothesis to the institutional ev
 
 The dual `derive_patient : InstEvidence × Cap^P → Evidence` is similarly required for `InstitutionalToPatient` events. ∎
 
-**INV-IX-01 (Derivation respects bounding).** [formalizes: `NOTE.md` §4C.1]
+**INV-IX-01 (Derivation respects bounding).** [formalizes: `NOTE.md` §4C.2]
 
 `derive_alloc` produces only resource-bounded `InstEvidence` (per DEF-IS-03). `derive_patient` produces only ontology-bounded `Evidence` (per DEF-PS-04). Cross-layer derivations cannot smuggle un-bounded atoms or resources into either substrate. ∎
 
-**OBL-IX-01 (Derivation soundness).** [formalizes: `NOTE.md` §4C.1]
+**OBL-IX-01 (Derivation soundness).** [formalizes: `NOTE.md` §4C.2]
 
 The derivation functions must be consistent with the substrate Galois connections:
 
@@ -712,7 +722,7 @@ with componentwise refinement: `(h₁, c₁) ⊑_S (h₂, c₂)` iff `h₁ ⊑_P
 
 Both components carry provenance independently. The composite is not itself a poset with new structure — it is the product poset — but it is the structural unit on which joint operators act. ∎
 
-**DEF-IX-04 (Joint operator signature).** [formalizes: `NOTE.md` §4C.2]
+**DEF-IX-04 (Joint operator signature).** [formalizes: `NOTE.md` §4C.1]
 
 A _joint operator_ is a function
 
@@ -720,7 +730,7 @@ A _joint operator_ is a function
 
 where `AbstainReason_J` is defined in §4.4. ∎
 
-**DEF-IX-05 (Joint operator decomposition).** [formalizes: `NOTE.md` §4C.2, "explicit"]
+**DEF-IX-05 (Joint operator decomposition).** [formalizes: `NOTE.md` §4C.1, "explicit"]
 
 Every joint operator decomposes into a triple `(δ_PS', δ_IS', coupling_check)` where:
 
@@ -732,7 +742,7 @@ A joint operator `δ_J` is not an opaque function but a structured composition o
 
 ### §4.3. Joint licensing
 
-**DEF-IX-06 (Licensed refinement).** [formalizes: `NOTE.md` §4C.2, "joint licensing"]
+**DEF-IX-06 (Licensed refinement).** [formalizes: `NOTE.md` §4C.1, "joint licensing"]
 
 A refinement of composite state `(h, c) ⟶ (h', c')` is _jointly licensed_ iff:
 
@@ -742,11 +752,11 @@ A refinement of composite state `(h, c) ⟶ (h', c')` is _jointly licensed_ iff:
 
 All three are required. Failing any one produces an abstention (§4.4), not a partial refinement. ∎
 
-**INV-IX-02 (Licensing is monotone).** [formalizes: `NOTE.md` §4C.2]
+**INV-IX-02 (Licensing is monotone).** [formalizes: `NOTE.md` §4C.1]
 
 If `(h, c) ⟶ (h', c')` is licensed and `(h', c') ⊑_S (h'', c'')` is also licensed, then `(h, c) ⟶ (h'', c'')` is licensed. Composition of licensed refinements is licensed. ∎
 
-**DEF-IX-07 (Coupling-check soundness).** [formalizes: `NOTE.md` §4C.2]
+**DEF-IX-07 (Coupling-check soundness).** [formalizes: `NOTE.md` §4C.1]
 
 A coupling check `coupling_check` is _sound_ iff its `true` outputs correspond to states in which both substrates can simultaneously satisfy their respective soundness obligations under the same evidence interpretation. Equivalent statement: a sound coupling check never returns `true` on a state pair that one substrate's view considers inconsistent with the cross-layer event.
 
@@ -829,3 +839,226 @@ Three obligations, matching the three principles of `NOTE.md` §4C. The load-bea
 ---
 
 _End of §4._
+
+## §5. Temporal evolution
+
+Formalizes `NOTE.md` §4D. This section defines how substrate components change over time without violating soundness, and how active substrate state relates to operator versions under which it was derived. Five principles from §4D are formalized: substrate-component versioning, evidence currency as a first-class signal, operator-set changes that are sound by construction, clinician-mediated propagation, and evolution-aware provenance.
+
+The interesting formal work in §5 is in §5.3 (operator-set evolution) and §5.4 (clinician-mediated propagation). Both are load-bearing for the `NOTE.md` §4D claim that the substrate forbids silent drift structurally.
+
+### §5.1. Substrate component versioning
+
+**DEF-TE-01 (Versioned substrate component).** [formalizes: `NOTE.md` §4D.1]
+
+A _versioned substrate component_ is any of:
+
+- An operator set: `Δ_PS^V`, `Δ_IS^V`, lifted via DEF-MP-17.
+- An individual operator: `(δ, ver(δ))`.
+- An ontology-bounded set: `Atom^V`, `R^V` (per DEF-PS-03, DEF-IS-03, both already carrying `ver`).
+- A capacity bound: `cap^V` (per DEF-IS-04).
+- A coupling check: `coupling_check^V`.
+- A derivation function: `derive_alloc^V`, `derive_patient^V`.
+
+Every component identifier above is required to carry a `Ver`. There is no path through which a substrate operation depends on an un-versioned component. ∎
+
+**INV-TE-01 (Version closure).** [formalizes: `NOTE.md` §4D.1]
+
+For any operator application that produces a value `v : T^P`, the resulting provenance `prov(v)` records the versions of every substrate component consulted in producing `v`: operator version, operator-set version, ontology version, and (for institutional operators) capacity-bound version.
+
+Reconstruction of `v`'s derivation from `prov(v)` yields the exact component versions under which `v` was produced, not merely the components by identity. ∎
+
+### §5.2. Evidence currency
+
+**DEF-TE-02 (Evidence currency carrier).** [formalizes: `NOTE.md` §4D.2, "currency as first-class signal"]
+
+Every evidence packet `e : Evidence` (and `e : InstEvidence`) carries a _currency carrier_:
+
+`Currency = { captured_at: Timestamp, expires_at: Option⟨Timestamp⟩, freshness_class: FreshnessClass }`
+
+where `FreshnessClass` is an enumeration (`Realtime`, `Recent`, `Stale`, `Historical`) defined per evidence type. A vital-sign reading classified `Realtime` 30 seconds ago is `Recent` 5 minutes later; a chest X-ray classified `Recent` is `Historical` 48 hours later. The transition thresholds are part of the substrate's configuration. ∎
+
+**DEF-TE-03 (Currency-aware operator signature).** [formalizes: `NOTE.md` §4D.2]
+
+Operator signatures are refined: every operator receives currency-annotated evidence and is required to make currency a decidable input to its abstention logic.
+
+`δ : Hyp^P × (Evidence × Currency) → Result⟨Hyp^P, AbstainReason_PS⟩^P`
+
+Operators may abstain with reason `InsufficientEvidence` (lifted to include a `currency_inadequate` subvariant) when the evidence's freshness class is below the operator's threshold. ∎
+
+**INV-TE-02 (Currency is not silent).** [formalizes: `NOTE.md` §4D.2]
+
+If an operator refines under evidence whose currency would not have permitted refinement under stricter freshness thresholds, the operator's output provenance records the currency at refinement time. A subsequent audit can identify refinements that were licensed only by lenient currency thresholds. ∎
+
+### §5.3. Sound operator-set evolution
+
+This is the formal content of "operator-set changes are sound by construction" (`NOTE.md` §4D.3). The structure draws on the Galois machinery in §1.4: operator-set changes are framed as transitions between abstract interpretations of the same underlying concrete semantics.
+
+**DEF-TE-04 (Operator-set transition).** [formalizes: `NOTE.md` §4D.3]
+
+An _operator-set transition_ is a pair `(Δ_PS_old, Δ_PS_new)` (or the institutional analog) related by a version successor: `ver(Δ_PS_new) > ver(Δ_PS_old)`.
+
+A transition is _admissible_ iff there exists a _transition justification_ — a structured record specifying, for each operator `δ_new ∈ Δ_PS_new`, exactly one of:
+
+1. **Carried forward:** `δ_new = δ_old` for some `δ_old ∈ Δ_PS_old`. No re-justification required.
+2. **Newly introduced:** `δ_new ∉ Δ_PS_old`. An explicit soundness argument (DEF-PS-08) is included.
+3. **Replacing:** `δ_new` replaces a specific `δ_old ∈ Δ_PS_old`. The justification includes both an independent soundness argument for `δ_new` and a _comparability statement_ relating `δ_new`'s output behavior to `δ_old`'s on the shared input domain. ∎
+
+**DEF-TE-05 (Comparability statement).** [formalizes: `NOTE.md` §4D.3]
+
+A comparability statement for a replacing operator is one of:
+
+- **Strict refinement:** `∀ h, e. δ_new(h, e) refines-or-equals δ_old(h, e)` under a stated order on `Result⟨...⟩`.
+- **Strict generalization:** the dual.
+- **Incomparable:** the new operator's refinements are not order-related to the old one's, with a stated rationale for why the change is nevertheless clinically motivated.
+
+`Incomparable` transitions are permitted but require explicit acknowledgement. They are the case where the new operator embodies a genuinely different clinical judgment, not a sharpening or softening of the old one (worked example in `NOTE.md` §7E.6, the SSC 2021 → 2026 transition). ∎
+
+**OBL-TE-01 (Transition admissibility).** [formalizes: `NOTE.md` §4D.3]
+
+No operator-set version `Δ_PS_new` may be activated without a stored, signed transition justification (DEF-TE-04) relative to its predecessor `Δ_PS_old`. The substrate refuses to load an operator-set version lacking a transition justification. ∎
+
+**INV-TE-03 (Transition does not retroactively change active state).** [formalizes: `NOTE.md` §4D.3]
+
+The activation of `Δ_PS_new` does not modify any active patient hypothesis whose provenance points to `Δ_PS_old`. Active hypotheses retain their provenance pointing to the operator-set version under which they were derived; the new operator set governs only future deductions (subject to §5.4). ∎
+
+### §5.4. Clinician-mediated propagation
+
+**DEF-TE-06 (Re-review event).** [formalizes: `NOTE.md` §4D.4]
+
+When an operator-set transition replaces an operator `δ_old`, the substrate emits a _re-review event_ for every active hypothesis `h^P` whose provenance includes a deduction step through `δ_old`:
+
+`ReReviewEvent = { active_hypothesis: Hyp^P, old_operator: OperatorName × Ver, new_operator: OperatorName × Ver, comparability: ComparabilityStatement, status: ReReviewStatus }`
+
+with `ReReviewStatus = Pending | ResolvedKeep | ResolvedReplace(new_hyp: Hyp^P, clinician: PrincipalId)`. ∎
+
+**INV-TE-04 (No automatic replacement).** [formalizes: `NOTE.md` §4D.4, "silent drift is structurally forbidden"]
+
+For an active hypothesis `h^P` with a pending re-review event:
+
+1. The substrate does not automatically apply `δ_new` to derive a replacement hypothesis. The active hypothesis remains `h^P` with its original provenance until the re-review event is resolved.
+2. The substrate may compute _what `δ_new` would produce_ and surface that as part of the re-review event's payload, but the surfaced candidate is not the active hypothesis.
+3. Transition from `Pending` to `Resolved*` requires a principal identifier (`PrincipalId`) — a structured token identifying the clinician (or other authorized role) who reviewed the event. ∎
+
+**OBL-TE-02 (No silent drift).** [formalizes: `NOTE.md` §4D.4]
+
+There is no code path that updates an active patient or institutional hypothesis as a side effect of activating a new operator-set version. The only paths from `h^P_old` (with provenance under `Δ_PS_old`) to `h^P_new` (with provenance under `Δ_PS_new`) are:
+
+1. A re-review event resolved as `ResolvedReplace`, with the new hypothesis carrying provenance to both the resolving principal and `Δ_PS_new`.
+2. Receipt of new evidence that triggers a fresh deduction under `Δ_PS_new` (in which case the active hypothesis updates through the normal §2 path).
+
+Path (1) is the only path that exists _because of_ the operator-set transition. Path (2) is a normal deduction whose currency happens to be after the transition. The two paths are observably distinct in provenance. ∎
+
+### §5.5. Evolution-aware provenance
+
+**DEF-TE-07 (Evolution-aware provenance carrier).** [formalizes: `NOTE.md` §4D.5]
+
+The provenance carrier from DEF-MP-14 is refined for §5: every elementary provenance event includes a `(component_identifier, version_identifier)` pair. The `derives_from` relation respects versions — two provenance carriers that record derivation through the "same" operator at different versions are not equivalent.
+
+In particular, queries of the form
+
+"show all currently-active hypotheses whose derivation chain includes any operator at version V or earlier"
+
+are required to be answerable from provenance alone, without external bookkeeping. ∎
+
+**INV-TE-05 (Provenance pins versions, not just identities).** [formalizes: `NOTE.md` §4D.5]
+
+For any value `v` in the substrate, `prov(v)` records the version (not merely the identity) of every substrate component consulted in producing `v`. This is the conjunction of INV-TE-01 with the version-respecting `derives_from` from DEF-TE-07. ∎
+
+**OBL-TE-03 (Auditability across evolution).** [formalizes: `NOTE.md` §4D.5]
+
+The provenance representation must support audit queries that filter on component versions, not just component identities. Specifically:
+
+- "Which active hypotheses were derived (in whole or in part) under operator-set version `V_old`?"
+- "Which re-review events resolved as `ResolvedReplace` between version transitions `V_old → V_new`?"
+- "For hypothesis `h^P`, what was every operator version consulted in its derivation chain?"
+
+All three must be answerable from stored provenance without reconstruction of operator state. ∎
+
+### §5.6. Summary of temporal-evolution proof obligations
+
+Consolidated from §5.1–§5.5; cross-listed in §6:
+
+- **OBL-TE-01** — Operator-set transitions require stored transition justifications (DEF-TE-04).
+- **OBL-TE-02** — No silent drift across operator-set versions; the two observably-distinct paths from old to new active hypothesis are exhaustive.
+- **OBL-TE-03** — Version-aware audit queries are answerable from provenance alone.
+
+Three obligations. The load-bearing one is OBL-TE-02 — it is the structural operationalization of `NOTE.md` §4D.4 ("silent drift is structurally forbidden") and the property that distinguishes this substrate from systems where guideline updates propagate by default.
+
+---
+
+_End of §5._
+
+## §6. Consolidated proof obligations
+
+Every `OBL-*` stated in §2–§5, grouped by substrate, with reading and origin pointer. No new content; this is a single-source-of-truth view for downstream artifacts.
+
+In v0.1.0-draft, every obligation is **stated, not discharged**. Discharge mechanism — mechanized proof, property-based test, runtime assertion, type-system enforcement — is an architectural concern. Each obligation's expected discharge tier is annotated.
+
+### §6.1. Patient substrate (§2)
+
+| Id            | Criticality | Reading                                                                                                                                                                           | Origin | Expected discharge tier                                                                         |
+| ------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------- |
+| **OBL-PS-01** | S           | Ontology membership (`Atom.is_member`) is decidable in bounded time; non-member atoms cannot enter `Hyp` through any path.                                                        | §2.2   | Type system + parsing-stage validation                                                          |
+| **OBL-PS-02** | P           | The patient Galois connection `(Obs_PS, α_PS, γ_PS, H_PS)` satisfies the DEF-MP-08 adjunction.                                                                                    | §2.3   | Property-based test in v0.x; mechanized proof candidate for v1.x                                |
+| **OBL-PS-03** | S           | Every operator in `Δ_PS` satisfies DEF-PS-08 (sound deduction).                                                                                                                   | §2.4   | Per-operator informal argument in v0.1; mechanized proof candidate later                        |
+| **OBL-PS-04** | S           | For any value `v : T^P` in the substrate, the full derivation chain back to source observations is reconstructible from `prov(v)` via `derives_from`.                             | §2.6   | Runtime assertion + audit-log verification                                                      |
+| **OBL-PS-05** | S           | No code path inserts a value into the active-hypothesis position without it being the `Refined(_)` branch of a sound operator's output; proposer outputs cannot bypass operators. | §2.7   | Type-system enforcement (distinct types for proposer-candidate and active-hypothesis positions) |
+
+### §6.2. Institutional substrate (§3)
+
+| Id            | Criticality | Reading                                                                                                                                                          | Origin | Expected discharge tier                                                                 |
+| ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------- |
+| **OBL-IS-01** | S           | Every capacity-update operator preserves physical validity: physically-valid input cannot yield physically-invalid output; would-be violations force abstention. | §3.2   | Type system (refinement type on `Cap` carrying physical-validity proof) + runtime check |
+| **OBL-IS-02** | S           | Resource membership (`R.is_member`) is decidable; free-form resource identifiers cannot enter `Cap`.                                                             | §3.2   | Type system + parsing-stage validation                                                  |
+| **OBL-IS-03** | P           | The institutional Galois connection `(Evt_IS, α_IS, γ_IS, H_IS)` satisfies DEF-MP-08.                                                                            | §3.3   | Property-based test in v0.x; mechanized proof candidate for v1.x                        |
+| **OBL-IS-04** | S           | Every operator in `Δ_IS` satisfies DEF-IS-08 (sound capacity update, including physical validity).                                                               | §3.4   | Per-operator informal argument in v0.1; mechanized proof candidate later                |
+| **OBL-IS-05** | S           | Provenance auditability holds for the institutional substrate (mirrors OBL-PS-04).                                                                               | §3.6   | Runtime assertion + audit-log verification                                              |
+| **OBL-IS-06** | S           | Proposer-operator separation enforced structurally in the institutional substrate (mirrors OBL-PS-05).                                                           | §3.7   | Type-system enforcement                                                                 |
+
+### §6.3. Interaction layer (§4)
+
+| Id            | Criticality | Reading                                                                                                                                                                                                                                           | Origin | Expected discharge tier                                                                                       |
+| ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
+| **OBL-IX-01** | F           | Cross-layer derivation functions (`derive_alloc`, `derive_patient`) are consistent with both substrate Galois connections; every derivation states an explicit bound on what the other substrate must accept.                                     | §4.1   | Per-derivation informal argument + property-based test                                                        |
+| **OBL-IX-02** | P           | Every coupling check used in a joint operator is sound per DEF-IX-07.                                                                                                                                                                             | §4.3   | Per-coupling-check informal argument; mechanized proof candidate later                                        |
+| **OBL-IX-03** | P           | No code path produces the net effect "patient-substrate preference suppressed, institutionally-feasible refinement silently applied" without an explicit `Divergent(diff)` abstention being produced and the composite state remaining unchanged. | §4.4   | Type-system enforcement (composite-state updates only via licensed-refinement constructor) + integration test |
+
+### §6.4. Temporal evolution (§5)
+
+| Id            | Criticality | Reading                                                                                                                                                                                                                                        | Origin | Expected discharge tier                                             |
+| ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------- |
+| **OBL-TE-01** | F           | No operator-set version may be activated without a stored transition justification (DEF-TE-04) relative to its predecessor; the substrate refuses to load operator-set versions lacking one.                                                   | §5.3   | Type-system enforcement + load-time validation                      |
+| **OBL-TE-02** | P           | The two paths from active hypothesis under `Δ_old` to active hypothesis under `Δ_new` (re-review resolution, fresh deduction with post-transition currency) are exhaustive and observably distinct in provenance; no third silent path exists. | §5.4   | Type-system enforcement + integration test + audit-log verification |
+| **OBL-TE-03** | S           | Version-aware audit queries are answerable from stored provenance alone, without reconstruction of operator state.                                                                                                                             | §5.5   | Provenance-schema validation + query-engine test                    |
+
+### §6.5. Tally and criticality distribution
+
+- 17 obligations total: 5 patient, 6 institutional, 3 interaction, 3 temporal.
+- 6 expected to discharge via type-system enforcement (or type-system + complementary mechanism).
+- 4 expected to discharge via property-based testing in v0.x with mechanization as a future candidate.
+- 5 expected to discharge via runtime assertion or audit-log verification.
+- 2 are per-instance informal arguments at v0.1, accumulating as `Δ_PS` and `Δ_IS` grow.
+
+The distribution matters for architectural planning: roughly a third of obligations live in the type system (so the build system can enforce them), roughly a third live in test infrastructure (so CI can enforce them per the meta-rule that principles without enforcement are decoration), and roughly a third live in runtime/audit (so they are observable in operation rather than at build time).
+
+**Criticality distribution (derived from NOTE.md v0.11.0 §4 tier assignments):**
+
+- **P (Position-critical):** 5 obligations — OBL-PS-02, OBL-IS-03, OBL-IX-02, OBL-IX-03, OBL-TE-02.
+- **S (Safety-property):** 10 obligations — OBL-PS-01, OBL-PS-03, OBL-PS-04, OBL-PS-05, OBL-IS-01, OBL-IS-02, OBL-IS-04, OBL-IS-05, OBL-IS-06, OBL-TE-03.
+- **F (Foundation):** 2 obligations — OBL-IX-01, OBL-TE-01.
+
+Total: P=5, S=10, F=2. Sum = 17 obligations. ✓
+
+(Note: the 18 principles in NOTE.md §4 yield 5 P, 10 S, 3 F by direct tier assignment; the 17 obligations in SPEC.md §6 yield 5 P, 10 S, 2 F. The slight discrepancy in F-count reflects that OBL-IX-01 and OBL-TE-01 are the two obligations corresponding to the three F-tier principles in NOTE.md — 4C.2, 4D.1, 4D.2 — because some F-tier principles aggregate into a single obligation while others split.)
+
+### §6.6. Criticality inheritance from NOTE.md
+
+Each obligation inherits its criticality from the NOTE.md §4 principle it most directly supports, via the `[formalizes:]` annotations in §2–§5. Where an obligation supports multiple principles, the higher tier (P > S > F) governs.
+
+This inheritance is the contract between NOTE.md and SPEC.md on criticality: if a NOTE.md principle's tier changes in a future revision, every SPEC.md obligation traceable to that principle re-inherits the new tier in lockstep. The audit query "for principle 4X.Y at tier T, which obligations does it carry?" is answerable from the §8 traceability table (pending in v0.2.0-draft).
+
+The inverse query — "for obligation OBL-XX-NN, which principles license it, and what is its inherited criticality?" — is the per-obligation accountability check that links architectural review back to the position note's load-bearing claims.
+
+---
+
+_End of §6._
