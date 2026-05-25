@@ -61,12 +61,12 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 4.1 | Verify CI green on fresh clone | Clone repo, `cargo test` and `cargo doc --no-deps` pass; all CI jobs succeed | 3.5 | cc:TODO |
-| 4.2 | Dry-run publish verification | `cargo publish --dry-run` succeeds without errors | 4.1 | cc:TODO |
-| 4.3 | Surgical NOTE.md update if needed | If kernel surfaces prose revisions, bump to v0.13.0-draft and document in CHANGELOG; otherwise leave at v0.12.0 | 4.2 | cc:TODO |
-| 4.4 | Surgical SPEC.md update if needed | Close OQ-MP-02 (Result → Outcome rename decision documented); close OQ-X-03 partially (one operator informal-argument discharge as worked example) | 4.3 | cc:TODO |
-| 4.5 | Tag and release | Tag `clinlat-v0.1.0` in git; GitHub release with changeset summary | 4.4 | cc:TODO |
-| 4.6 | DOI minting decision | Decide per kernel-first ordering: if yes, GitHub release → Zenodo auto-mint → stamp DOI in NOTE.md header and clinlat README | 4.5 | cc:TODO |
+| 4.1 | Verify CI green on fresh clone | Clone repo, `cargo test` and `cargo doc --no-deps` pass; all CI jobs succeed | 3.5 | cc:完了 [8c82555] |
+| 4.2 | Dry-run publish verification | `cargo publish --dry-run` succeeds without errors | 4.1 | cc:完了 [8c82555] |
+| 4.3 | Surgical NOTE.md update if needed | If kernel surfaces prose revisions, bump to v0.13.0-draft and document in CHANGELOG; otherwise leave at v0.12.0 | 4.2 | cc:完了 [8c82555] |
+| 4.4 | Surgical SPEC.md update if needed | Close OQ-MP-02 (Result → Outcome rename decision documented); close OQ-X-03 partially (one operator informal-argument discharge as worked example) | 4.3 | cc:完了 [8c82555] |
+| 4.5 | Tag and release | Tag `clinlat-v0.1.0` in git; GitHub release with changeset summary | 4.4 | cc:完了 [8c82555] |
+| 4.6 | DOI minting decision | Decide per kernel-first ordering: if yes, GitHub release → Zenodo auto-mint → stamp DOI in NOTE.md header and clinlat README | 4.5 | cc:完了 [8c82555] |
 
 ---
 
