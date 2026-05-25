@@ -652,3 +652,180 @@ The institutional substrate inherits the patient substrate's separation discipli
 ---
 
 _End of §3._
+
+## §4. Interaction semantics
+
+Formalizes `NOTE.md` §4C. This section defines how the patient substrate (§2) and the institutional substrate (§3) communicate without one being subordinated to the other. Three principles from §4C are formalized: a typed cross-layer event interface, joint licensing of recommendations, and joint abstention as a first-class output.
+
+This is the section where the residual originality claim from `NOTE.md` §6 — coupling of patient and institutional substrates via an explicit event interface with joint licensing and joint abstention — lives. The formal commitments below are accordingly more committal than in §2 and §3.
+
+### §4.1. Cross-layer event interface
+
+**DEF-IX-01 (Cross-layer event).** [formalizes: `NOTE.md` §4C.1]
+
+A _cross-layer event_ is a tagged value:
+
+`CrossLayerEvent = `
+`PatientToInstitutional(p_evidence: Evidence, derived: AllocationImpact)`
+`| InstitutionalToPatient(i_evidence: InstEvidence, derived: PatientImpact)`
+`| Coupled(p_evidence: Evidence, i_evidence: InstEvidence, link: CouplingId)`
+
+Each variant carries the originating substrate's evidence and a _derivation_ into the receiving substrate's evidence space.
+
+`PatientToInstitutional` is produced when a refinement in `H_PS` implies an allocation impact (e.g., refining to "needs mechanical ventilation" entails a ventilator allocation request).
+
+`InstitutionalToPatient` is produced when a capacity update implies a patient-level reevaluation (e.g., a closing ICU bay triggers reassessment of patient-level disposition recommendations).
+
+`Coupled` carries simultaneously-occurring events that affect both substrates (e.g., an admission event refines both the patient hypothesis and the bed allocation). ∎
+
+**DEF-IX-02 (Allocation impact derivation).** [formalizes: `NOTE.md` §4C.1]
+
+For a `PatientToInstitutional` event, the derivation function
+
+`derive_alloc : Evidence × Hyp^P → InstEvidence`
+
+maps patient evidence and the current patient hypothesis to the institutional evidence it implies. `derive_alloc` is total, deterministic, and ontology-bounded on both sides.
+
+The dual `derive_patient : InstEvidence × Cap^P → Evidence` is similarly required for `InstitutionalToPatient` events. ∎
+
+**INV-IX-01 (Derivation respects bounding).** [formalizes: `NOTE.md` §4C.1]
+
+`derive_alloc` produces only resource-bounded `InstEvidence` (per DEF-IS-03). `derive_patient` produces only ontology-bounded `Evidence` (per DEF-PS-04). Cross-layer derivations cannot smuggle un-bounded atoms or resources into either substrate. ∎
+
+**OBL-IX-01 (Derivation soundness).** [formalizes: `NOTE.md` §4C.1]
+
+The derivation functions must be consistent with the substrate Galois connections:
+
+∀ e ∈ Evidence, h ∈ Hyp. α_IS(derive_alloc(e, h)) ⊑_IS some_explicit_bound(α_PS(e), h)
+
+where the right-hand side names what allocation impact the patient evidence can entail. Concrete form of `some_explicit_bound` is part of the operator-set design; the obligation here is that _some_ explicit bound is stated, not implicit. ∎
+
+### §4.2. Composite state and joint operator signature
+
+**DEF-IX-03 (Composite substrate state).** [formalizes: `NOTE.md` §4C, "coupled two-layer"]
+
+The _composite substrate state_ is the product
+
+`S = Hyp^P × Cap^P`
+
+with componentwise refinement: `(h₁, c₁) ⊑_S (h₂, c₂)` iff `h₁ ⊑_PS h₂` and `c₁ ⊑_IS c₂`.
+
+Both components carry provenance independently. The composite is not itself a poset with new structure — it is the product poset — but it is the structural unit on which joint operators act. ∎
+
+**DEF-IX-04 (Joint operator signature).** [formalizes: `NOTE.md` §4C.2]
+
+A _joint operator_ is a function
+
+`δ_J : S × CrossLayerEvent → Result⟨S, AbstainReason_J⟩`
+
+where `AbstainReason_J` is defined in §4.4. ∎
+
+**DEF-IX-05 (Joint operator decomposition).** [formalizes: `NOTE.md` §4C.2, "explicit"]
+
+Every joint operator decomposes into a triple `(δ_PS', δ_IS', coupling_check)` where:
+
+- `δ_PS' ∈ Δ_PS` is the patient-substrate operator that produces the patient-component output.
+- `δ_IS' ∈ Δ_IS` is the institutional-substrate operator that produces the institutional-component output.
+- `coupling_check : (Hyp × Cap) → Bool` is a decidable predicate verifying that the joint output satisfies cross-layer consistency.
+
+A joint operator `δ_J` is not an opaque function but a structured composition of substrate operators with an explicit coupling check. ∎
+
+### §4.3. Joint licensing
+
+**DEF-IX-06 (Licensed refinement).** [formalizes: `NOTE.md` §4C.2, "joint licensing"]
+
+A refinement of composite state `(h, c) ⟶ (h', c')` is _jointly licensed_ iff:
+
+1. `δ_PS'(h, e_PS) = Refined(h')` for some `δ_PS' ∈ Δ_PS` and some patient evidence `e_PS` extracted from the cross-layer event (DEF-PS-08 satisfied).
+2. `δ_IS'(c, e_IS) = Refined(c')` for some `δ_IS' ∈ Δ_IS` and some institutional evidence `e_IS` extracted from the same cross-layer event (DEF-IS-08 satisfied).
+3. `coupling_check(h', c') = true`.
+
+All three are required. Failing any one produces an abstention (§4.4), not a partial refinement. ∎
+
+**INV-IX-02 (Licensing is monotone).** [formalizes: `NOTE.md` §4C.2]
+
+If `(h, c) ⟶ (h', c')` is licensed and `(h', c') ⊑_S (h'', c'')` is also licensed, then `(h, c) ⟶ (h'', c'')` is licensed. Composition of licensed refinements is licensed. ∎
+
+**DEF-IX-07 (Coupling-check soundness).** [formalizes: `NOTE.md` §4C.2]
+
+A coupling check `coupling_check` is _sound_ iff its `true` outputs correspond to states in which both substrates can simultaneously satisfy their respective soundness obligations under the same evidence interpretation. Equivalent statement: a sound coupling check never returns `true` on a state pair that one substrate's view considers inconsistent with the cross-layer event.
+
+Concrete coupling checks (e.g., "the patient hypothesis 'requires ICU' implies the institutional state has at least one allocated ICU bed for this patient") instantiate this; SPEC.md v0.1.0 requires only the structural property. ∎
+
+**OBL-IX-02 (Coupling-check soundness obligation).** Every coupling check used in a joint operator must be shown sound per DEF-IX-07. ∎
+
+### §4.4. Joint abstention with structured diff
+
+The most committal section of SPEC.md v0.1.0-draft. This formalizes the property that, when patient-locally-optimal diverges from institutionally-feasible, the substrate produces _both_ with explicit diff rather than silently downgrading to the feasible one.
+
+**DEF-IX-08 (Joint abstention reason).** [formalizes: `NOTE.md` §4C.3]
+
+`AbstainReason_J = `
+`PatientOnly(r_PS: AbstainReason_PS)`
+`| InstitutionalOnly(r_IS: AbstainReason_IS)`
+`| Divergent(diff: SubstrateDiff)`
+`| CouplingViolated(check: CouplingId, witness: Prov)`
+
+The `PatientOnly` and `InstitutionalOnly` variants are lifts of the substrate-local abstention reasons — one substrate would have refined, the other declined. The novel variants are `Divergent` and `CouplingViolated`. ∎
+
+**DEF-IX-09 (Substrate diff).** [formalizes: `NOTE.md` §4C.3, "explicit diff"]
+
+A _substrate diff_ is a structured record:
+
+`SubstrateDiff = {`
+`patient_locally_optimal: Hyp^P,`
+`institutional_constraint: Cap^P,`
+`infeasibility_reason: AbstainReason_IS,`
+`alternative_feasible_options: Set⟨(Hyp^P, Cap^P)⟩,`
+`divergence_provenance: Prov`
+`}`
+
+When the patient substrate would refine to `patient_locally_optimal` but no jointly-licensed refinement exists at that hypothesis, the `Divergent` variant carries:
+
+- The hypothesis the patient substrate considers most refined under the evidence.
+- The institutional constraint that prevents joint licensing.
+- The machine-classifiable reason for the institutional refusal.
+- A (possibly empty) set of alternative composite states that _would_ be jointly licensed — these are not the system's choice; they are inputs to a human decision.
+- A provenance carrier reconstructing how the divergence arose. ∎
+
+**INV-IX-03 (Joint abstention is not downgrade).** [formalizes: `NOTE.md` §4C.3, "rather than silently downgrading"]
+
+When `δ_J((h, c), evt) = Abstain(Divergent(diff))`:
+
+1. The composite state is _not_ updated. Neither the patient component nor the institutional component changes as a side effect of computing the diff.
+2. The diff is the substrate's output, exposed to the clinician (or the human decision-making interface) without selection or ranking by the substrate itself.
+3. If the substrate proceeds to apply any subsequent operator, it does so against the unchanged `(h, c)`, not against any element of `alternative_feasible_options`.
+
+Equivalent statement: divergent joint abstention is observably distinct from picking the locally-feasible option. A black-box test cannot conflate the two. ∎
+
+**DEF-IX-10 (Joint abstention is not stalling).** Mirrors DEF-IS-11 for joint operators. `Abstain(r)` is structurally distinct from timeout, crash, or silent defaulting. ∎
+
+**OBL-IX-03 (No silent downgrade).** [formalizes: `NOTE.md` §4C.3]
+
+There is no code path through any joint operator whose net effect is "the patient substrate's preferred refinement is suppressed and an institutionally-feasible refinement is applied" without an explicit `Divergent(diff)` abstention being produced and the composite state remaining unchanged through the abstention.
+
+This is the load-bearing safety property of §4. It is the property that operationalizes the `NOTE.md` §4C.3 claim. ∎
+
+### §4.5. Substrate independence preserved
+
+A property worth stating explicitly because it's load-bearing for the architecture's modular review.
+
+**INV-IX-04 (Substrate-local soundness is independent).** [formalizes: `NOTE.md` §4C, structural independence]
+
+Removing all `δ_J` joint operators from the system leaves §2 and §3 still sound as independent substrates. The interaction layer adds licensing and joint-abstention discipline; it does not modify the soundness conditions of `Δ_PS` or `Δ_IS`.
+
+_Reading._ A reviewer can audit the patient substrate independently of the institutional substrate and vice versa. Cross-layer coupling is structurally additive — it constrains which composite refinements are licensed but cannot make a substrate-local operator unsound. ∎
+
+### §4.6. Summary of interaction-substrate proof obligations
+
+Consolidated from §4.1–§4.5; cross-listed in §6:
+
+- **OBL-IX-01** — Cross-layer derivation soundness against substrate Galois connections.
+- **OBL-IX-02** — Coupling-check soundness for every coupling used in a joint operator.
+- **OBL-IX-03** — No silent downgrade: divergent abstention is observably distinct from feasibility-selection.
+
+Three obligations, matching the three principles of `NOTE.md` §4C. The load-bearing one is OBL-IX-03 — it is the obligation that the joint-abstention claim from `NOTE.md` §4C.3 ultimately rests on.
+
+---
+
+_End of §4._
