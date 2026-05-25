@@ -1,15 +1,17 @@
 # Substrate-First Clinical AI: Architecture Diagrams
 
-**Version:** v0.1.0-draft
-**Date:** 2026-05-24
-**Status:** Working draft for scrutiny. Companion to substrate-first-clinical-ai-v0.10.1-draft.md.
-**License (proposed, open decision):** CC BY 4.0
+**Version:** v0.2.0-draft
+**Date:** 2026-05-25
+**Status:** Working draft for scrutiny. Companion to `NOTE.md` v0.12.0-draft and `SPEC.md` v0.3.0-draft.
+**License:** CC BY 4.0
 
 ---
 
 ## Purpose
 
-These diagrams visualize the architecture specified in the position note (v0.10.1). They are not a replacement for the prose; they are an aid to comprehension. The position note is the source of truth; where a diagram and the note disagree, the note wins and the diagram is wrong.
+These diagrams visualize the architecture formalized in `SPEC.md` (v0.3.0-draft) and described in clinical prose in `NOTE.md` (v0.12.0-draft). They are not a replacement for either; they are an aid to comprehension.
+
+**Resolution order for conflicts** (per `CLAUDE.md` and `SPEC.md` §0.1, §9.3): `NOTE.md` wins if `SPEC.md` and `NOTE.md` disagree; `SPEC.md` wins if a diagram and `SPEC.md` disagree. The diagrams render `SPEC.md`'s typed structures (Galois connections, operator sets, joint-licensing decomposition, re-review events for both substrates) rather than re-rendering `NOTE.md`'s prose-level commitments. Where a diagram and either document disagree, the diagram is wrong.
 
 Five diagrams, each addressing a primary view the others cannot show:
 
@@ -40,6 +42,43 @@ Five diagrams, each addressing a primary view the others cannot show:
 | Label on arrow | What flows along that relationship (data type, event type, return type) |
 
 Mermaid's class/style support is used to encode color. Bold and dashed borders are encoded via stroke-width and stroke-dasharray respectively.
+
+---
+
+## Principle-to-formalization map
+
+Each diagram below visualizes structures that `SPEC.md` v0.3.0 formalizes against `NOTE.md` v0.12.0's eighteen load-bearing principles. The table records, per `NOTE.md` §4 principle: criticality tier (P/S/F from `NOTE.md` §4 intro), the `SPEC.md` formal anchors (DEF/INV/OBL), and the diagrams in which the structure is visible.
+
+| `NOTE.md` principle | Criticality | `SPEC.md` anchors | Visible in |
+| --- | --- | --- | --- |
+| 4A.1 Persistent patient state | P | DEF-PS-01, DEF-PS-02, DEF-PS-05, DEF-PS-06; OBL-PS-02 | D1, D2 |
+| 4A.2 Justified reversible transitions; ontology-bounded | S | DEF-PS-03/04/07/08/09; INV-PS-01/02/03; OBL-PS-01/03 | D1, D2, D3 |
+| 4A.3 First-class abstention | S | DEF-PS-10/11; INV-PS-04 | D1, D2, D3 |
+| 4A.4 Auditable provenance | S | DEF-PS-12/13; INV-PS-05; OBL-PS-04 | D1, D2 |
+| 4A.5 Constrained refinement proposer | S | DEF-PS-14/15; INV-PS-06; OBL-PS-05 | D3, D5 |
+| 4B.1 Persistent institutional state | P | DEF-IS-01/02/04/05/06; OBL-IS-03 | D1, D2 |
+| 4B.2 Justified capacity transitions; resource-bounded | S | DEF-IS-03/07/08/09; INV-IS-01/02/03; OBL-IS-01/02/04 | D1, D2, D3 |
+| 4B.3 Allocation abstention | S | DEF-IS-10/11; INV-IS-04 | D1, D2 |
+| 4B.4 Auditable allocation provenance | S | DEF-IS-12/13; INV-IS-05; OBL-IS-05 | D1, D2 |
+| 4B.5 Constrained capacity-learned proposers | S | DEF-IS-14/15; INV-IS-06; OBL-IS-06 | D3, D5 |
+| 4C.1 Joint licensing | P | DEF-IX-03/04/05/06/07; INV-IX-02; OBL-IX-02 | D1, D2 |
+| 4C.2 Cross-layer events | F | DEF-IX-01/02; INV-IX-01; OBL-IX-01 | D1, D2 |
+| 4C.3 Joint abstention (incl. structured diff DEF-IX-09) | P | DEF-IX-08/09/10; INV-IX-03; OBL-IX-03 | D1, D2 |
+| 4D.1 Versioned substrate components | F | DEF-TE-01; INV-TE-01 | D1, D4 |
+| 4D.2 Evidence currency | F | DEF-TE-02/03; INV-TE-02 | D1, D4 |
+| 4D.3 Sound evolution under operator-set change | S | DEF-TE-04/05; INV-TE-03; OBL-TE-01 | D4 |
+| 4D.4 Clinician-mediated propagation (+ institutional symmetry) | P | DEF-TE-06, **DEF-TE-06b**; INV-TE-04; OBL-TE-02 | D4 |
+| 4D.5 Evolution-aware provenance | S | DEF-TE-07; INV-TE-05; OBL-TE-03 | D1, D4 |
+
+**Criticality vocabulary** (`NOTE.md` §4 intro):
+
+- **P** — Position-critical. Violation falsifies a substrate/layer/coupling claim the position itself depends on.
+- **S** — Safety-property. Violation breaks a stated safety property within an existing substrate.
+- **F** — Foundation. Violation breaks supporting infrastructure other principles depend on.
+
+Tier counts in §4: 5 P, 10 S, 3 F (matches `SPEC.md` §6.5 obligation distribution at 5 P / 10 S / 2 F, with the F-asymmetry on 4D.1/4D.2 documented as OQ-X-01).
+
+`INV-IX-04` (substrate-local soundness preserved under coupling) is a cross-cutting structural invariant that does not anchor to a single principle; it formalizes the §4C intro claim that "the two substrates are coupled but not collapsed." Visible implicitly in Diagrams 1 and 3 as the architectural separation of the patient-substrate and institutional-substrate columns.
 
 ---
 
@@ -334,18 +373,25 @@ flowchart TB
     STATE_ADV["Operator status: advisory<br/>(licenses with currency caveat)"]
     STATE_INACT["Operator status: inactive<br/>(cannot license without re-verification)"]
 
-    SE["Sound-evolution checker<br/>(add: no rejected→accepted without policy;<br/>modify: track per-recommendation diff;<br/>retire: flag outstanding for re-review)"]
+    SE["Sound-evolution checker<br/>(DEF-TE-04, DEF-TE-05;<br/>add: no rejected→accepted without policy;<br/>modify: track per-recommendation diff;<br/>retire: flag outstanding for re-review;<br/>category: refines / generalizes / incomparable)"]
 
-    AR["Active recommendations<br/>(licensed under prior operator-version)"]
-    CMP["Clinician-mediated propagation<br/>(re-review event generator)"]
-    RR_EVT["Re-review event<br/>per active recommendation"]
+    AR_PAT["Active patient recommendations<br/>(licensed under prior Δ_PS version)"]
+    AR_INST["Active institutional allocations<br/>(licensed under prior Δ_IS version)"]
 
-    CHOICE{"Clinician<br/>decision"}
-    TRANS["Transition to new operator-version<br/>(logged)"]
-    CONT["Continue under prior version<br/>(documented justification, logged)"]
+    CMP_PAT["Clinician-mediated propagation<br/>(DEF-TE-06: ReReviewEvent;<br/>NOTE §4D.4 ¶1)"]
+    CMP_INST["Institutional-authority propagation<br/>(DEF-TE-06b: InstReReviewEvent;<br/>NOTE §4D.4 ¶2 — institutional symmetry)"]
+
+    RR_PAT["Patient re-review event<br/>per active hypothesis<br/>(status: Pending → ResolvedKeep / ResolvedReplace)"]
+    RR_INST["Institutional re-review event<br/>per active capacity hypothesis<br/>(authority_class: CapacityManager /<br/>EthicsCommittee / FormularyCommittee / ...)"]
+
+    CHOICE_PAT{"Clinician<br/>decision"}
+    CHOICE_INST{"Institutional<br/>authority<br/>decision"}
+
+    TRANS["Transition to new operator-version<br/>(ResolvedReplace, logged)"]
+    CONT["Continue under prior version<br/>(ResolvedKeep, documented justification)"]
     REEVAL["Explicit re-evaluation<br/>at next assessment"]
 
-    EAP["Evolution-aware provenance<br/>(operator-version at decision-time,<br/>currency-status at decision-time,<br/>propagation-decision)"]
+    EAP["Evolution-aware provenance<br/>(DEF-TE-07; operator-version, currency-status,<br/>propagation-decision, resolving principal)"]
 
     REG_OUT["Regulatory artifact<br/>(FDA PCCP submission,<br/>EU AI Act Art. 72 monitoring report)"]
     INST_LEARN["Institutional retrospective<br/>(outcome correlation by<br/>operator-version transition)"]
@@ -360,14 +406,24 @@ flowchart TB
 
     SRC -. operator update available .-> SE
     SE --> VR
-    SE -. operator transitioned .-> AR
-    AR --> CMP
-    CMP -.one per active recommendation.-> RR_EVT
-    RR_EVT --> CHOICE
+    SE -. Δ_PS transitioned .-> AR_PAT
+    SE -. Δ_IS transitioned .-> AR_INST
 
-    CHOICE --> TRANS
-    CHOICE --> CONT
-    CHOICE --> REEVAL
+    AR_PAT --> CMP_PAT
+    AR_INST --> CMP_INST
+
+    CMP_PAT -.one per active hypothesis.-> RR_PAT
+    CMP_INST -.one per active capacity hypothesis.-> RR_INST
+
+    RR_PAT --> CHOICE_PAT
+    RR_INST --> CHOICE_INST
+
+    CHOICE_PAT --> TRANS
+    CHOICE_PAT --> CONT
+    CHOICE_PAT --> REEVAL
+    CHOICE_INST --> TRANS
+    CHOICE_INST --> CONT
+    CHOICE_INST --> REEVAL
 
     TRANS --> EAP
     CONT --> EAP
@@ -383,22 +439,27 @@ flowchart TB
     classDef decision fill:#fff,stroke:#dc3545,stroke-width:3px,color:#000
 
     class SRC,LSR external
-    class VR,CC,SE,AR,EAP,REG_OUT,INST_LEARN substrate
+    class VR,CC,SE,AR_PAT,AR_INST,EAP,REG_OUT,INST_LEARN substrate
     class STATE_A,STATE_ADV,STATE_INACT state
-    class CMP,RR_EVT safetyGate
-    class CHOICE decision
+    class CMP_PAT,CMP_INST,RR_PAT,RR_INST safetyGate
+    class CHOICE_PAT,CHOICE_INST decision
     class TRANS,CONT,REEVAL substrate
 ```
 
-**Reading this diagram.** External sources update at their own cadences (SSC every 4-5 years per 4D.2, KDIGO decadal with focused updates, antibiogram weekly, formulary daily). Living systematic review infrastructure (Cochrane LSR, MAGICapp, Australian Living Evidence Collaboration) feeds currency signals to the substrate's currency monitor. The version registry tracks every operator-version pair with effective period and status. Operators progress through three states: active (default), advisory (currency threshold crossed, licenses with explicit caveat), inactive (configured-period elapsed past threshold, cannot license without re-verification).
+**Reading this diagram.** External sources update at their own cadences (SSC every 4-5 years per 4D.2, KDIGO decadal with focused updates, antibiogram weekly, formulary daily). Living systematic review infrastructure (Cochrane LSR, MAGICapp, Australian Living Evidence Collaboration) feeds currency signals to the substrate's currency monitor. The version registry (DEF-TE-01) tracks every operator-version pair with effective period and status. Operators progress through three states: active (default), advisory (currency threshold crossed, licenses with explicit caveat per DEF-TE-03), inactive (configured-period elapsed past threshold, cannot license without re-verification).
 
-When an operator update is available, the sound-evolution checker enforces the semantics of position note 4D.3: adding a new operator must not silently license previously-rejected recommendations; modifying tracks per-recommendation licensing differences; retiring flags outstanding recommendations for re-review.
+When an operator update is available, the sound-evolution checker (DEF-TE-04) enforces the semantics of `NOTE.md` §4D.3: adding a new operator must not silently license previously-rejected recommendations; modifying tracks per-recommendation licensing differences; retiring flags outstanding recommendations for re-review. Each transition is categorized as **refines / generalizes / incomparable** (DEF-TE-05); incomparable transitions carry an additional justification burden per §4D.3 ¶2.
 
-For active recommendations licensed under a prior operator-version, the clinician-mediated propagation generator (4D.4 — the load-bearing safety claim of Section 4D) emits one re-review event per active recommendation. The clinician decides: transition to the new operator-version, continue under the prior version with documented justification, or hold for explicit re-evaluation at next assessment. All three decisions are logged in evolution-aware provenance.
+The diagram makes explicit the **symmetric re-review pathway** that `NOTE.md` §4D.4 commits to and `SPEC.md` v0.3.0 formalizes:
 
-Evolution-aware provenance (4D.5) supports two downstream uses: regulatory artifact production (FDA PCCP submissions for change-control records, EU AI Act Article 72 post-market monitoring reports) and institutional retrospective analysis (outcome correlation by operator-version transition — did patients transitioned at point X have different outcomes than those continuing on the prior operator?).
+- **Patient-side propagation** (DEF-TE-06): when `Δ_PS` transitions, the patient substrate emits a `ReReviewEvent` for every active hypothesis whose provenance includes the retired operator. The responsible clinician resolves it as `ResolvedReplace`, `ResolvedKeep` (continue under prior version with documented justification), or holds for re-evaluation at next assessment.
+- **Institutional-side propagation** (DEF-TE-06b — new in v0.3.0 / NOTE.md §4D.4 ¶2): when `Δ_IS` transitions (queue-priority policy revision, scarcity-allocation framework revision, formulary-restriction modification), the institutional substrate emits an `InstReReviewEvent` for every active capacity hypothesis whose provenance includes the retired operator. The event carries an `authority_class` field that routes resolution to the appropriate institutional authority — capacity manager, ethics committee, or formulary committee depending on the operator class. The lifecycle is structurally identical to the patient path.
 
-The 7E.6 worked example in the position note traces this lifecycle for the SSC 2021 → SSC 2026 transition concretely. The general shape this diagram shows is what 7E.6 instantiates.
+This symmetry is load-bearing: `INV-TE-04` (no automatic replacement) and `OBL-TE-02` (no silent drift) both apply to `Δ_PS` and `Δ_IS` and hold **unconditionally on transition type** — even when the new operator strictly refines the old, automatic propagation is forbidden. The "obviously safer" judgment is reserved for human authority.
+
+Evolution-aware provenance (DEF-TE-07, `NOTE.md` §4D.5) supports two downstream uses: regulatory artifact production (FDA PCCP submissions for change-control records, EU AI Act Article 72 post-market monitoring reports) and institutional retrospective analysis (outcome correlation by operator-version transition — did patients transitioned at point X have different outcomes than those continuing on the prior operator?). `OBL-TE-03` requires that audit queries filter on component _versions_ (not merely identities).
+
+The 7E.6 worked example in the position note traces this lifecycle for the SSC 2021 → SSC 2026 transition concretely on the patient side. The general shape this diagram shows — including the institutional symmetric path — is what 7E.6 instantiates and what NOTE.md §4D.4 ¶2 mandates for institutional operator revisions.
 
 ---
 
@@ -490,17 +551,17 @@ flowchart TB
 
 ---
 
-## Cross-diagram traceability to position note sections
+## Cross-diagram traceability to `NOTE.md` and `SPEC.md`
 
-| Diagram | Maps to position note section(s) |
-| --- | --- |
-| 1: Component decomposition | Section 4 (4A, 4B, 4C, 4D), Section 5 (system identity), Section 7A/B/C (build description) |
-| 2: Data and event flow | Section 4A.1-4A.4, 4B.1-4B.4, 4C, plus 7E.1 (sepsis worked example for concrete instantiation) |
-| 3: Substrate-learned-component boundary | Section 4A.5, 4B.5, 4C, plus Section 5 (regulatory positioning under UNDCS taxonomy) |
-| 4: Temporal-evolution lifecycle | Section 4D (all five principles), Section 6 temporal-evolution prior art subsection, Section 7E.6 worked example |
-| 5: Learned-component composition (expansion of 3) | Section 4A.5 (enumerated patient learned components), Section 4B.5 (enumerated institutional learned components), Section 5 (operations-research solvers, transformer-branching) |
+| Diagram | `NOTE.md` v0.12.0 sections | `SPEC.md` v0.3.0 sections |
+| --- | --- | --- |
+| 1: Component decomposition | §4 (4A, 4B, 4C, 4D), §5 (system identity), §7A/B/C (build description) | §2 (patient substrate), §3 (institutional substrate), §4 (interaction layer), §5 (temporal evolution) |
+| 2: Data and event flow | §4A.1–4A.4, §4B.1–4B.4, §4C, plus §7E.1 (sepsis worked example for concrete instantiation) | §2.3 (Galois connection), §2.4–§2.5 (operators + abstention), §3.3–§3.5 (institutional operators + abstention), §4.1–§4.4 (cross-layer + joint licensing + joint abstention with structured diff DEF-IX-09) |
+| 3: Substrate-learned-component boundary | §4A.5, §4B.5, §4C, plus §5 (regulatory positioning under UNDCS taxonomy) | §2.7 (constrained proposer DEF-PS-14, INV-PS-06, OBL-PS-05), §3.7 (constrained capacity-learned proposer DEF-IS-14, INV-IS-06, OBL-IS-06) |
+| 4: Temporal-evolution lifecycle | §4D (all five principles), §6 temporal-evolution prior art subsection, §7E.6 worked example | §5.1 (versioning DEF-TE-01), §5.2 (currency DEF-TE-02/03), §5.3 (sound evolution DEF-TE-04/05, OBL-TE-01), §5.4 (re-review **DEF-TE-06 + DEF-TE-06b**, INV-TE-04, OBL-TE-02), §5.5 (evolution-aware provenance DEF-TE-07, OBL-TE-03) |
+| 5: Learned-component composition (expansion of 3) | §4A.5 (enumerated patient learned components), §4B.5 (enumerated institutional learned components), §5 (operations-research solvers, transformer-branching) | §2.7 (DEF-PS-14 black-box constraint), §3.7 (DEF-IS-14 capacity-learned proposer); v0.3.0 deliberately leaves model-architecture taxonomy out of SPEC.md scope — see SPEC.md §0.5 |
 
-If a future revision of the position note adds, removes, or substantively modifies any principle in Section 4, the relevant diagram(s) above need updating to match. The diagrams version independently of the note; this v0.1.0 reflects note v0.10.1.
+If a future revision of `NOTE.md` adds, removes, or substantively modifies any principle in §4, the relevant diagram(s) above need updating to match. Similarly, if `SPEC.md` adds, removes, or restructures the formal anchors (`DEF-*`, `INV-*`, `OBL-*`), the diagrams and the principle-to-formalization map at the top of this document need updating. The diagrams version independently of `NOTE.md` and `SPEC.md`; this v0.2.0 reflects `NOTE.md` v0.12.0 and `SPEC.md` v0.3.0.
 
 ---
 
@@ -517,5 +578,7 @@ If a future revision of the position note adds, removes, or substantively modifi
 ---
 
 ## Changelog
+
+- **v0.2.0-draft (2026-05-25):** Re-anchored to `SPEC.md` v0.3.0-draft per `SPEC.md` §0.1 and §9.3 (ARCHITECTURE.md draws its diagrams from `SPEC.md`, not from `NOTE.md` directly). Header references bumped to `NOTE.md` v0.12.0-draft and `SPEC.md` v0.3.0-draft. Purpose section now states the three-document resolution order explicitly (`NOTE.md` > `SPEC.md` > diagrams). New **principle-to-formalization map** added between visual conventions and Diagram 1, listing all eighteen `NOTE.md` §4 principles with their criticality tier (P/S/F per `NOTE.md` §4 intro: 5 P / 10 S / 3 F), their `SPEC.md` formal anchors (`DEF-*`, `INV-*`, `OBL-*`), and the diagrams each principle is visible in. Cross-cutting invariant `INV-IX-04` (substrate-local soundness preserved under coupling) called out explicitly. **Diagram 4 (temporal-evolution lifecycle) restructured to render the institutional symmetric re-review path** mandated by `NOTE.md` §4D.4 ¶2 and formalized as `DEF-TE-06b` in `SPEC.md` §5.4: when `Δ_IS` transitions (queue-priority, scarcity-allocation, formulary-restriction), `InstReReviewEvent`s carry an `authority_class` field routing resolution to capacity manager, ethics committee, or formulary committee rather than to a bedside clinician. The lifecycle is structurally identical to the patient path (DEF-TE-06) — same `ReReviewStatus` lifecycle, same provenance discipline, same prohibition on automatic replacement per `INV-TE-04`. Operator-transition categorization (refines / generalizes / incomparable per DEF-TE-05) called out in the sound-evolution checker node. Cross-diagram traceability table extended to include `SPEC.md` v0.3.0 section anchors alongside `NOTE.md` v0.12.0 section anchors. Diagram 4 reading prose rewritten to make the symmetry, `INV-TE-04` unconditional-on-transition-type property, and `OBL-TE-02 / OBL-TE-03` audit-query obligation visible. Diagrams 1, 2, 3, 5 are structurally unchanged from v0.1.0; their content remains consistent with the new anchors. Four open decisions from v0.1.0 carried forward unchanged (6th diagram for cross-cutting concerns, splitting Diagram 5 by maturity, shared style file, executive-summary single-diagram view).
 
 - **v0.1.0-draft (2026-05-24):** Initial draft. Five Mermaid diagrams covering component decomposition (1), data and event flow (2), substrate-learned-component boundary (3), temporal-evolution lifecycle (4), and learned-component composition as expansion of 3 (5). Visual conventions stated once at the top and applied across all five. Cross-diagram traceability table mapping each diagram to position note sections. Maturity asymmetry encoded via border style (solid / short-dashed / long-dashed) in Diagram 5. Side-by-side columns separate patient-substrate components from institutional-substrate components in Diagram 5. Symbolic proposers (operations-research solvers, hand-specified allocation policies) shown with green coloring to distinguish from learned components (orange) while preserving the architectural truth that they sit at the same interface position. Refinement proposer slot in Diagram 5 highlighted as the headline research question per Section 5 line 155's *[inferred]* "transformer-branching" claim, with architectural options listed (LDT-style / LLM-class / HRM-class / new architecture entirely) and no commitment to any single option. The diagrams reflect the multi-model heterogeneity reading the position note's hedges in 4A.5, 4B.5, and Section 5 support; this reading was clarified during the design discussion that produced this companion document and is recorded here as the architectural truth the diagrams encode. Four open decisions named explicitly for future versions: 6th diagram for cross-cutting concerns, splitting Diagram 5 by maturity, shared style file, executive-summary single-diagram view.
