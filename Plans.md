@@ -26,7 +26,7 @@
 |------|---------|-----|---------|--------|
 | 1.1 | Define `OntologyAdapter` trait signature | `pub trait OntologyAdapter { fn resolve_atom(&self, code: &str, system: OntologySystem) -> Result<Atom, OntologyError>; fn validate_compatibility(&self, atom1: &Atom, atom2: &Atom) -> bool; }` with doc anchoring to DEF-PS-03 | 0.2 | cc:done [97b0304] |
 | 1.2 | Implement `SnomedAdapter` — thin client for SNOMED CT API/snapshot (per M1.1 scope) | Adapter impl with ≥3 example codes; `cargo test` passes; doc refs SNOMED CT Edition reference | 1.1 [tdd:required] | cc:todo |
-| 1.3 | Implement `RxNormAdapter` — thin client for RxNorm (drugs, strengths) | Adapter impl with ≥3 example drug codes; `cargo test` passes | 1.1 [tdd:required] | cc:todo |
+| 1.3 | Implement `RxNormAdapter` — thin client for RxNorm (drugs, strengths) | Adapter impl with ≥3 example drug codes; `cargo test` passes | 1.1 [tdd:required] | cc:done [8e085f0] |
 | 1.4 | Implement `LoincAdapter` — thin client for LOINC (lab tests, vital signs) | Adapter impl with ≥3 example LOINC codes; `cargo test` passes | 1.1 [tdd:required] | cc:todo |
 | 1.5 | Implement `Icd11Adapter` — thin client for ICD-11 (diagnoses, procedure codes) | Adapter impl with ≥3 example ICD-11 codes; `cargo test` passes | 1.1 [tdd:required] | cc:todo |
 | 1.6 | Define `Atom` type as replacement for `&'static str` AtomId | `pub struct Atom { system: OntologySystem, code: String, preferred_term: String }` with PartialEq, Hash, Clone; doc names DEF-PS-03 | 1.1 | cc:todo |
