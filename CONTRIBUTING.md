@@ -21,6 +21,30 @@ This tool provides enhanced development ergonomics for the clinlat crate and rel
 
 See the [cargo-skill documentation](https://github.com/yourlibrary/cargo-skill) for detailed usage.
 
+### Pre-commit Hooks
+
+We use [`pre-commit`](https://pre-commit.com/) to enforce code quality checks before commits.
+
+**Setup:**
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+**Hooks include:**
+- **Standard:** Trailing whitespace, end-of-file fixers, YAML/JSON/TOML validation, merge conflict detection, private key detection
+- **Markdown:** Linting with `markdownlint`
+- **Rust:** `cargo fmt`, `cargo clippy -- -D warnings`, `cargo check`
+
+**Run manually:**
+
+```bash
+pre-commit run --all-files
+```
+
+The `.pre-commit-config.yaml` file defines all hooks and their configuration.
+
 ## Project Structure
 
 ```

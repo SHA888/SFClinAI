@@ -1,0 +1,77 @@
+# Pre-commit hooks for SFClinAI
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end-of-file whitespace
+      - id: check-yaml
+        name: Check YAML syntax
+        args: [--unsafe]
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-toml
+        name: Check TOML syntax
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: detect-private-key
+        name: Detect private keys
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        args: [--fix=lf]
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.37.0
+    hooks:
+      - id: markdownlint
+        name: Lint Markdown
+        args: [--fix]
+
+  # Rust formatting with rustfmt
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0.2
+    hooks:
+      - id: fmt
+        name: Rust fmt
+        language: rust
+        entry: cargo fmt --all --
+        pass_filenames: false
+        stages: [commit]
+      - id: clippy
+        name: Rust clippy
+        language: rust
+        entry: cargo clippy --all-targets --all-features -- -D warnings
+        pass_filenames: false
+        stages: [commit]
+
+  # Cargo check
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0.2
+    hooks:
+      - id: cargo-check
+        name: Cargo check
+        language: rust
+        entry: cargo check --all-features
+        pass_filenames: false
+        stages: [commit]
+
+# Configuration per file type
+exclude: |
+  (?x)^(
+    \.git/|
+    \.claude/|
+    \.harness-mem/|
+    target/|
+    clinlat/target/|
+    \.github/|
+    LICENSE|
+    LICENSE-MIT|
+    LICENSE-APACHE
+  )
