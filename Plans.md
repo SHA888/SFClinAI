@@ -37,11 +37,11 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 2.1 | Encode SOFA respiratory thresholds (PaO₂/FiO₂ ratios) | Thresholds for SOFA scores 0–4 per Sepsis-3 (≥400, 300–399, 200–299, 100–199, <100) hardcoded and documented | 1.6 | cc:TODO |
-| 2.2 | Define `SofaRespEvidence` type | `SofaRespEvidence` struct with fields `pao2: f64`, `fio2: f64`, `on_mech_vent: bool` per Sepsis-3 requirement | 2.1 | cc:TODO |
-| 2.3 | Define SOFA respiratory hypothesis variants | `Hyp` variants `Unknown`, `Score0` through `Score4`; refinement order: `Unknown` ⊐ each `Score{N}`; compatibility: each `Score{N}` compat only with self and `Unknown` | 2.2 | cc:TODO |
-| 2.4 | Implement `SofaRespOperator` | `impl Operator for SofaRespOperator`; body: compute pao2/fio2, map to SOFA score, abstain if fio2 ≤ 0 or score ≥3 without ventilation, otherwise refine to `Score{N}`; test-passing implementation | 2.3 [tdd:required] | cc:TODO |
-| 2.5 | Write soundness argument for operator | `clinlat/docs/operators/sofa_resp_soundness.md`; state three DEF-PS-08 soundness clauses and argue each; cite Vincent et al. 1996 and Singer et al. 2016 (Sepsis-3); informal-argument tier per OBL-PS-03 | 2.4 | cc:TODO |
+| 2.1 | Encode SOFA respiratory thresholds (PaO₂/FiO₂ ratios) | Thresholds for SOFA scores 0–4 per Sepsis-3 (≥400, 300–399, 200–299, 100–199, <100) hardcoded and documented | 1.6 | cc:完了 [769cf78] |
+| 2.2 | Define `SofaRespEvidence` type | `SofaRespEvidence` struct with fields `pao2: f64`, `fio2: f64`, `on_mech_vent: bool` per Sepsis-3 requirement | 2.1 | cc:完了 [769cf78] |
+| 2.3 | Define SOFA respiratory hypothesis variants | `Hyp` variants `Unknown`, `Score0` through `Score4`; refinement order: `Unknown` ⊐ each `Score{N}`; compatibility: each `Score{N}` compat only with self and `Unknown` | 2.2 | cc:完了 [769cf78] |
+| 2.4 | Implement `SofaRespOperator` | `impl Operator for SofaRespOperator`; body: compute pao2/fio2, map to SOFA score, abstain if fio2 ≤ 0 or score ≥3 without ventilation, otherwise refine to `Score{N}`; test-passing implementation | 2.3 [tdd:required] | cc:完了 [769cf78] |
+| 2.5 | Write soundness argument for operator | `clinlat/docs/operators/sofa_resp_soundness.md`; state three DEF-PS-08 soundness clauses and argue each; cite Vincent et al. 1996 and Singer et al. 2016 (Sepsis-3); informal-argument tier per OBL-PS-03 | 2.4 | cc:完了 [769cf78] |
 
 ---
 
