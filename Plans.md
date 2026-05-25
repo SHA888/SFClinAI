@@ -10,7 +10,7 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 0.1 | Add `clinlat/` directory to repo root | Directory exists, `.gitignore` updated | - | cc:TODO |
+| 0.1 | Add `clinlat/` directory to repo root | Directory exists, `.gitignore` updated | - | cc:完了 [15f5230] |
 | 0.2 | Initialize Rust crate with correct metadata | `Cargo.toml` has edition=2024, MSRV=1.86.0, license="MIT OR Apache-2.0", repository and documentation fields | 0.1 | cc:TODO |
 | 0.3 | Add dual license files (MIT, Apache-2.0) at repo root | `LICENSE-MIT` and `LICENSE-APACHE` present and verbatim; existing `LICENSE` clarified for prose vs code | 0.2 | cc:TODO |
 | 0.4 | Update README.md License section for code dual-licensing | README License section reflects "MIT OR Apache-2.0" for code | 0.3 | cc:TODO |
