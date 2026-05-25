@@ -15,7 +15,7 @@
 | 0.3 | Add dual license files (MIT, Apache-2.0) at repo root | `LICENSE-MIT` and `LICENSE-APACHE` present and verbatim; existing `LICENSE` clarified for prose vs code | 0.2 | cc:完了 [478cad4] |
 | 0.4 | Update README.md License section for code dual-licensing | README License section reflects "MIT OR Apache-2.0" for code | 0.3 | cc:完了 [92e80ac] |
 | 0.5 | Add CONTRIBUTING.md stub with cargo-skill docs | CONTRIBUTING.md exists, mentions `cargo install cargo-skill`, links to tooling docs | 0.2 | cc:完了 [8e86d36] |
-| 0.6 | CI scaffolding: fmt, clippy, test, doc, semver, MSRV checks | `.github/workflows/ci.yml` runs all 6 checks; all checks pass on fresh clone | 0.2 | cc:TODO |
+| 0.6 | CI scaffolding: fmt, clippy, test, doc, semver, MSRV checks | `.github/workflows/ci.yml` runs all 6 checks; all checks pass on fresh clone | 0.2 | cc:完了 [5898727] |
 | 0.7 | rust-toolchain.toml and .gitignore for Rust | rust-toolchain.toml pins 1.86.0; .gitignore covers target/, Cargo.lock, IDE artifacts | 0.2 | cc:TODO |
 
 ---
