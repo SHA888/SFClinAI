@@ -57,10 +57,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: obi1kenobi/cargo-semver-checks-action@v2
-        with:
-          package: clinlat
-          feature-group: default-features
+      - run: cargo install cargo-semver-checks
+      - run: cargo semver-checks check-release --default-features
         working-directory: clinlat
 
   msrv:
