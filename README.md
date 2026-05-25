@@ -8,7 +8,7 @@ This repository holds the prose of that position, plus the **`clinlat` Rust kern
 
 ## What it is
 
-A working draft (`NOTE.md`, v0.12.0-draft) and accompanying Mermaid diagrams (`ARCHITECTURE.md`, v0.1.0) staking out a falsifiable diagnostic claim: **clinical AI is bottlenecked less by model size than by the absence of explicit, auditable, reversible belief-state architectures that can update medical hypotheses under hard safety constraints** (NOTE.md §3).
+A working draft (`NOTE.md`, v0.12.0-draft) and accompanying Mermaid diagrams (`ARCHITECTURE.md`, v0.2.0-draft) staking out a falsifiable diagnostic claim: **clinical AI is bottlenecked less by model size than by the absence of explicit, auditable, reversible belief-state architectures that can update medical hypotheses under hard safety constraints** (NOTE.md §3).
 
 The architecture rests on eighteen load-bearing principles — five for the patient-state substrate (§4A), five for the institutional-state substrate (§4B), three for the interaction semantics between them (§4C), and five for temporal evolution and substrate currency (§4D). Each is stated separately so it can be attacked separately.
 
@@ -31,7 +31,7 @@ Short on time: stopping after step 3 still holds the load-bearing claim.
 ```
 SFClinAI/
 ├── NOTE.md             # Position note, v0.12.0-draft
-├── ARCHITECTURE.md     # Five Mermaid diagrams, v0.1.0
+├── ARCHITECTURE.md     # Five Mermaid diagrams, v0.2.0-draft
 ├── SPEC.md             # Engineering formalization, v0.3.0-draft
 ├── clinlat/            # Rust substrate kernel, v0.1.0
 │   ├── Cargo.toml
@@ -59,7 +59,7 @@ The composite is positioned as a route from UNDCS-class to CCS-class under the T
 ## Status and maturity
 
 - `NOTE.md`: **v0.12.0-draft**. Working draft for scrutiny. Not for citation.
-- `ARCHITECTURE.md`: **v0.1.0**. Initial diagrams; expected to co-evolve with the note.
+- `ARCHITECTURE.md`: **v0.2.0-draft**. Re-anchored to `SPEC.md` v0.3.0-draft: principle-to-formalization map covering all eighteen principles with criticality tier (P/S/F) and SPEC.md DEF/INV/OBL anchors; Diagram 4 now renders the institutional symmetric re-review path (DEF-TE-06b) alongside the patient-side clinician-mediated path.
 - `clinlat`: **v0.1.0** (published to crates.io). Kernel implements patient-state substrate with `Hyp` poset, `Outcome<H,A>` result type, and SOFA-3 respiratory deduction operator. See [`clinlat/README.md`](clinlat/README.md) for quick start and [`clinlat/docs/operators/sofa_resp_soundness.md`](clinlat/docs/operators/sofa_resp_soundness.md) for soundness argument.
 - No deployed system. No regulatory engagement.
 - Originality assessment timestamped 2026-05-24, valid through **2026-08-24** (quarterly re-verification cadence, per NOTE.md header and §6 closing).
