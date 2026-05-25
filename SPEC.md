@@ -254,3 +254,208 @@ A construct used by every substrate component subject to evolution (§5).
 ---
 
 _End of §1._
+
+## §2. Patient-state substrate
+
+Formalizes `NOTE.md` §4A. This section defines the structure within which a single patient's clinical state is represented, refined under observations, and operated on.
+
+### §2.1. Clinical hypothesis space
+
+**DEF-PS-01 (Clinical hypothesis space).** [formalizes: `NOTE.md` §4A.1]
+
+A _clinical hypothesis space_ for a patient is a triple `H_PS = (Hyp, ⊑_PS, compat_PS)` where:
+
+- `Hyp` is a set of _clinical hypotheses_. Concrete instantiation (e.g., as ontology-bounded propositional combinations) is given in §2.2.
+- `⊑_PS ⊆ Hyp × Hyp` is a partial order (per DEF-MP-01), the _refinement order_. `h₁ ⊑_PS h₂` reads "h₁ is at least as specific as h₂."
+- `compat_PS ⊆ Hyp × Hyp` is a compatibility predicate (per DEF-MP-04). Two hypotheses are compatible when they can be coherently held simultaneously about the same patient at the same time.
+
+`H_PS` is a _partial-meet poset_ in the sense of MC-1: meets are defined only on `compat_PS`-related pairs. ∎
+
+**DEF-PS-02 (Top hypothesis).** [formalizes: `NOTE.md` §4A.1, initial state]
+
+`Hyp` contains a distinguished element `⊤_PS` (read: "any patient state") such that ∀ h ∈ Hyp. h ⊑_PS ⊤_PS. This is the initial hypothesis before any observation. ∎
+
+**INV-PS-01 (Compatibility under refinement).** [formalizes: `NOTE.md` §4A.2, monotonicity of clinical reasoning]
+
+If `h₁ ⊑_PS h₂` and `compat_PS(h₂, h₃)`, then `compat_PS(h₁, h₃)`.
+
+_Reading._ If a hypothesis is compatible with another, every refinement of it is also compatible with that other. Refining toward greater specificity cannot create new incompatibilities — it can only inherit them. ∎
+
+**INV-PS-02 (Meet via refinement).** [formalizes: `NOTE.md` §4A.2]
+
+For compatible `h₁, h₂`, the meet `h₁ ⊓_PS h₂` is the unique (by antisymmetry) most general hypothesis that refines both. Existence is required by DEF-MP-05; uniqueness follows from antisymmetry of `⊑_PS`. ∎
+
+### §2.2. Ontology-bounded hypothesis candidates
+
+**DEF-PS-03 (Ontology-bounded set).** [formalizes: `NOTE.md` §4A.3]
+
+An _ontology-bounded set_ `O` is a finite or recursively enumerable set equipped with:
+
+- A _membership predicate_ `is_member : T → Bool` for the carrier type `T` (decidable).
+- A _version identifier_ `ver(O) : Ver` (per DEF-MP-16).
+- A _source attribution_ `source(O) : OntologyId` naming the underlying terminology (SNOMED CT, RxNorm, LOINC, ICD-11, or other).
+
+Concrete ontology bindings — which terminologies, at which versions, with what mappings between them — are out of scope per §0.5. SPEC.md depends only on the abstract `OntologyBoundedSet` interface. ∎
+
+**DEF-PS-04 (Hypothesis candidate constraint).** [formalizes: `NOTE.md` §4A.3]
+
+Let `Atom` be an ontology-bounded set of _clinical atoms_ (concept identifiers — diseases, findings, medications, lab observations, anatomical sites). A hypothesis `h ∈ Hyp` is _ontology-bounded_ iff every atomic concept appearing in `h` satisfies `Atom.is_member`.
+
+`Hyp` is constrained so that every `h ∈ Hyp` is ontology-bounded. Hypotheses referencing non-member atoms are not representable in the substrate. ∎
+
+**OBL-PS-01 (Ontology decidability).** [formalizes: `NOTE.md` §4A.3, "no free-form atoms"]
+
+Membership in `Atom` must be decidable in bounded time. Free-text concepts, ad-hoc strings, and tokens not present in `Atom` cannot enter `Hyp` through any path. This is enforced by parsing-stage validation: any input hypothesis is parsed against `Atom` at construction time and rejected if it fails. ∎
+
+### §2.3. Patient observation space and Galois connection
+
+**DEF-PS-05 (Patient observation space).** [formalizes: `NOTE.md` §4A.1, concrete side]
+
+The _patient observation space_ `Obs_PS = (Obs, ⊑_Obs)` is a poset where `Obs` is the set of multisets of _typed clinical observations_ — vital signs, lab values, imaging findings, history elements, medication administrations — each timestamped and provenance-tagged.
+
+`o₁ ⊑_Obs o₂` iff `o₁` contains all observations in `o₂` (and possibly more): the order refines toward more-informed observation states. ∎
+
+**DEF-PS-06 (Patient Galois connection).** [formalizes: `NOTE.md` §4A.1, refinement structure]
+
+The _patient Galois connection_ is `(Obs_PS, α_PS, γ_PS, H_PS)` where:
+
+- `α_PS : Obs → Hyp` maps an observation multiset to the _most refined hypothesis it entails_.
+- `γ_PS : Hyp → Obs` maps a hypothesis to the _set of observations compatible with it_.
+
+`(α_PS, γ_PS)` satisfy DEF-MP-08 (Galois adjunction). Existence is asserted as a structural requirement on any concrete instantiation of the substrate. ∎
+
+**OBL-PS-02 (Adjunction soundness).** Any concrete patient substrate must produce `α_PS`, `γ_PS` satisfying:
+
+∀ o ∈ Obs, h ∈ Hyp. α_PS(o) ⊑_PS h ⟺ o ⊑_Obs γ_PS(h)
+
+Violation means the substrate's refinement semantics are inconsistent with its observation semantics. ∎
+
+### §2.4. Deduction operators
+
+**DEF-PS-07 (Patient-substrate operator signature).** [formalizes: `NOTE.md` §4A.2]
+
+A _patient-substrate operator_ is a function
+
+`δ : Hyp × Evidence → Result⟨Hyp, AbstainReason_PS⟩`
+
+where `Evidence` is a typed evidence packet (an element of `Obs` together with provenance — see §2.6), and `AbstainReason_PS` is defined in §2.5.
+
+Operators take a current hypothesis and incoming evidence, and either return a refined hypothesis or abstain with a reason. ∎
+
+**DEF-PS-08 (Soundness of a deduction operator).** [formalizes: `NOTE.md` §4A.2, "sound deduction"]
+
+A deduction operator `δ` is _sound_ iff, for all `h ∈ Hyp` and evidence packets `e` carrying observation `o_e ∈ Obs`:
+
+If `δ(h, e) = Refined(h')`, then `h' ⊑_PS h` _and_ `h' ⊑_PS α_PS(o_e)`.
+
+_Reading._ A sound operator (1) only refines — never generalizes — the current hypothesis, and (2) only produces a refinement that is itself entailed by the evidence's most-refined abstraction. The operator may abstain instead; abstention is never unsound. ∎
+
+**INV-PS-03 (Operator monotonicity).** [formalizes: `NOTE.md` §4A.2]
+
+For any sound `δ` and any `h ∈ Hyp`, `e ∈ Evidence`: `δ(h, e) = Refined(h') ⟹ h' ⊑_PS h`. (This is half of DEF-PS-08, separated as a named invariant because downstream code will check it independently.) ∎
+
+**DEF-PS-09 (Operator set).** [formalizes: `NOTE.md` §4A.2, "a defined family"]
+
+The _operator set_ of a patient substrate is a finite, named, versioned set `Δ_PS = {(name_i, δ_i, ver_i)}` where each `δ_i` is sound (DEF-PS-08) and `ver_i : Ver` identifies the operator's version.
+
+`Δ_PS` is itself versioned: `ver(Δ_PS) : Ver`. Changes to `Δ_PS` follow the discipline in §5 (temporal evolution). ∎
+
+**OBL-PS-03 (Operator set soundness).** [formalizes: `NOTE.md` §4A.2]
+
+Every `δ_i ∈ Δ_PS` satisfies DEF-PS-08. No operator may enter `Δ_PS` without a stated soundness argument (mechanized proof in a later tier; informal argument in v0.1.0-draft). ∎
+
+### §2.5. Abstention semantics
+
+**DEF-PS-10 (Abstention reason).** [formalizes: `NOTE.md` §4A.4]
+
+The patient-substrate abstention type is a sum:
+
+`AbstainReason_PS = `
+`InsufficientEvidence(missing: Set⟨RequiredObservation⟩)`
+`| OutOfDistribution(detail: OodReport)`
+`| AmbiguousRefinement(candidates: Set⟨Hyp⟩, rationale: Prov)`
+`| OperatorPreconditionUnmet(operator: OperatorName, condition: PreconditionId)`
+`| OntologyOutOfScope(atoms: Set⟨AtomId⟩)`
+
+Each variant carries structured information about _why_ the operator declined to commit. Free-text abstention is not permitted: every abstention is machine-classifiable. ∎
+
+**INV-PS-04 (Abstention is sound).** [formalizes: `NOTE.md` §4A.4]
+
+Abstention never violates DEF-PS-08. An operator returning `Abstain(r)` makes no claim about the patient's state, so soundness is trivially preserved. The only soundness-relevant property of abstention is that the reason `r` is well-formed (`r : AbstainReason_PS` and all carried data satisfies its substructure invariants). ∎
+
+**DEF-PS-11 (Abstention is not bottom).** [formalizes: `NOTE.md` §4A.4, "first-class output"]
+
+`Abstain(r)` is _not_ equivalent to any `Refined(h)` for any `h ∈ Hyp`, including a hypothetical bottom `⊥_PS`. The two epistemic states — "no further refinement is supported" and "I decline to refine" — are encoded by distinct constructors of `Result⟨Hyp, AbstainReason_PS⟩` and cannot be conflated.
+
+(SPEC.md does not commit to whether `Hyp` has a bottom element; if one exists, it represents "a maximally-specific patient state consistent with all observations," which is a different concept from abstention. See §7 for open questions.) ∎
+
+### §2.6. Provenance integration
+
+**DEF-PS-12 (Patient-substrate evidence packet).** [formalizes: `NOTE.md` §4A.5, "auditable provenance"]
+
+An _evidence packet_ is `Evidence = Obs^P` (per DEF-MP-15). Every observation entering a deduction operator carries a provenance carrier identifying its source (device, lab system, clinician input, prior operator output). ∎
+
+**DEF-PS-13 (Operator output with provenance).** [formalizes: `NOTE.md` §4A.5]
+
+A deduction operator's signature is refined from DEF-PS-07 to:
+
+`δ : Hyp^P × Evidence → Result⟨Hyp^P, AbstainReason_PS⟩^P`
+
+That is, the input hypothesis carries provenance, the evidence carries provenance, and the output (whether refined hypothesis or abstention) carries provenance derived from both inputs via `·` (DEF-MP-14).
+
+The refined hypothesis's provenance is `(prov_h · prov_e · op_marker)` where `op_marker : Prov` identifies which operator and operator-version produced this refinement. ∎
+
+**INV-PS-05 (Provenance closure).** [formalizes: `NOTE.md` §4A.5]
+
+Every value in the patient substrate that derives from any operator application carries a provenance composed (via `·`) from the provenances of all inputs and the operator's marker. There is no path by which a value reaches the substrate without provenance: every constructor of `Hyp^P`, `Evidence`, and `Result⟨...⟩^P` requires a `Prov` argument. ∎
+
+**OBL-PS-04 (Provenance auditability).** [formalizes: `NOTE.md` §4A.5]
+
+For any value `v : T^P` in the substrate, the `derives_from` relation (DEF-MP-14) must allow reconstruction of the full derivation chain back to source observations. The substrate must reject any operator whose output provenance fails to satisfy this property. ∎
+
+### §2.7. The learned proposer as a constrained black box
+
+**DEF-PS-14 (Refinement proposer signature).** [formalizes: `NOTE.md` §4A.5, "constrained refinement proposer"]
+
+A _refinement proposer_ is a function
+
+`π : Hyp^P × Evidence → Set⟨Hyp⟩`
+
+returning a finite set of _candidate refinements_ of the current hypothesis. The proposer is the integration point for learned components (LLMs, classifiers, retrieval systems, etc.).
+
+The proposer does **not** decide. Its output is candidate hypotheses; whether any candidate is accepted is determined by the deduction operators in §2.4. ∎
+
+**DEF-PS-15 (Proposer codomain constraint).** [formalizes: `NOTE.md` §4A.5, "constrained"]
+
+The proposer is constrained at its _codomain_ — every element of its output set must satisfy:
+
+1. Be ontology-bounded (DEF-PS-04).
+2. Be at most one refinement step from the input hypothesis under `⊑_PS`, where "one step" is defined by the substrate's operator set (precise definition: there exists `δ ∈ Δ_PS` and an evidence packet derived from the input evidence such that `δ` could plausibly produce this refinement).
+
+Candidates failing either constraint are filtered before reaching the deduction operators. Filtering is not the proposer's responsibility; it is the substrate's enforcement boundary. ∎
+
+**INV-PS-06 (Proposer cannot bypass soundness).** [formalizes: `NOTE.md` §4A.5, "constrained"]
+
+The proposer cannot produce a refined hypothesis that becomes the active hypothesis without passing through a sound deduction operator (DEF-PS-08). Even if the proposer is adversarial, the soundness of the active hypothesis depends only on `Δ_PS`, not on `π`.
+
+This is the load-bearing safety property of the patient substrate: **learned-component behavior cannot violate substrate soundness**. ∎
+
+**OBL-PS-05 (Proposer-operator separation).** [formalizes: `NOTE.md` §4A.5]
+
+No code path may insert a value into `Hyp^P` (as the active patient hypothesis) without that value being the `Refined(_)` branch of some sound operator's output. Enforcement is structural: the active-hypothesis type and the proposer-output type are distinct, and only operator results inhabit the former. ∎
+
+### §2.8. Summary of patient-substrate proof obligations
+
+Consolidated from §2.1–§2.7; cross-listed in §6:
+
+- **OBL-PS-01** — Ontology decidability.
+- **OBL-PS-02** — Adjunction soundness of `(α_PS, γ_PS)`.
+- **OBL-PS-03** — Every operator in `Δ_PS` satisfies DEF-PS-08.
+- **OBL-PS-04** — Provenance auditability (full derivation chain reconstructible).
+- **OBL-PS-05** — Proposer-operator separation enforced structurally.
+
+These are stated, not discharged. Discharge mechanism (mechanized proof, property-based test, runtime assertion) is an architectural concern.
+
+---
+
+_End of §2._
