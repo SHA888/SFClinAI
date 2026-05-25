@@ -61,6 +61,7 @@ jobs:
         with:
           package: clinlat
           feature-group: default-features
+        working-directory: clinlat
 
   msrv:
     name: MSRV (Rust 1.86.0)
