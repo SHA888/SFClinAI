@@ -251,6 +251,143 @@ pub trait OntologyAdapter: Send + Sync {
     fn cache_mode(&self) -> CacheMode;
 }
 
+/// SNOMED CT ontology adapter with in-memory LRU cache and offline snapshot fallback.
+///
+/// Per [DESIGN-D2][1] and [SPEC.md DEF-PS-03][2]:
+/// SNOMEDAdapter resolves SNOMED CT codes to atoms using an in-memory LRU cache backed by
+/// an offline snapshot. In M1, snapshots are hand-coded test data. Real SNOMED CT API
+/// integration (if needed) defers to M5+.
+///
+/// [1]: https://github.com/SHA888/SFClinAI/blob/main/DESIGN-D2-ontology.md
+/// [2]: https://github.com/SHA888/SFClinAI/blob/main/SPEC.md#def-ps-03
+pub struct SNOMEDAdapter {
+    /// In-memory LRU cache for frequently accessed codes.
+    cache: std::sync::Arc<tokio::sync::Mutex<lru::LruCache<String, Atom>>>,
+    /// Offline snapshot: pre-loaded SNOMED CT codes.
+    snapshot: std::sync::Arc<std::collections::HashMap<String, Atom>>,
+    /// SNOMED CT Edition version (e.g., "2026-01-31").
+    version: String,
+    /// Caching mode for this adapter.
+    mode: CacheMode,
+}
+
+impl SNOMEDAdapter {
+    /// Create a new SNOMEDAdapter.
+    ///
+    /// # Arguments
+    /// * `snapshot` - Pre-loaded SNOMED codes as a HashMap.
+    /// * `cache_size` - LRU cache capacity (e.g., 10000 for typical pilot).
+    /// * `version` - SNOMED CT Edition version (e.g., "2026-01-31").
+    /// * `mode` - Caching mode (CacheOnly for M1 with in-memory snapshots).
+    ///
+    /// # Example
+    /// ```ignore
+    /// use clinlat::ontology::{SNOMEDAdapter, Atom, OntologySystem, CacheMode};
+    /// use std::collections::HashMap;
+    ///
+    /// let mut snapshot = HashMap::new();
+    /// snapshot.insert(
+    ///     "67822003".to_string(),
+    ///     Atom {
+    ///         system: OntologySystem::SNOMED,
+    ///         code: "67822003".to_string(),
+    ///         preferred_term: "Hypoxemia".to_string(),
+    ///         version: "2026-01-31".to_string(),
+    ///     },
+    /// );
+    ///
+    /// let adapter = SNOMEDAdapter::new(snapshot, 10000, "2026-01-31", CacheMode::CacheOnly);
+    /// ```
+    pub fn new(
+        snapshot: std::collections::HashMap<String, Atom>,
+        cache_size: usize,
+        version: impl Into<String>,
+        mode: CacheMode,
+    ) -> Self {
+        SNOMEDAdapter {
+            cache: std::sync::Arc::new(tokio::sync::Mutex::new(lru::LruCache::new(
+                std::num::NonZeroUsize::new(cache_size).unwrap(),
+            ))),
+            snapshot: std::sync::Arc::new(snapshot),
+            version: version.into(),
+            mode,
+        }
+    }
+
+    /// Create a test adapter with standard SNOMED examples.
+    ///
+    /// This is a convenience constructor for testing. Loads three standard SNOMED codes
+    /// relevant to respiratory dysfunction (supporting SOFA-respiratory operator tests).
+    #[cfg(test)]
+    pub fn test_adapter() -> Self {
+        let mut snapshot = std::collections::HashMap::new();
+        snapshot.insert(
+            "67822003".to_string(),
+            Atom {
+                system: OntologySystem::SNOMED,
+                code: "67822003".to_string(),
+                preferred_term: "Hypoxemia".to_string(),
+                version: "2026-01-31".to_string(),
+            },
+        );
+        snapshot.insert(
+            "3723001".to_string(),
+            Atom {
+                system: OntologySystem::SNOMED,
+                code: "3723001".to_string(),
+                preferred_term: "Acute respiratory distress syndrome".to_string(),
+                version: "2026-01-31".to_string(),
+            },
+        );
+        snapshot.insert(
+            "29303001".to_string(),
+            Atom {
+                system: OntologySystem::SNOMED,
+                code: "29303001".to_string(),
+                preferred_term: "Respiratory distress".to_string(),
+                version: "2026-01-31".to_string(),
+            },
+        );
+
+        SNOMEDAdapter::new(snapshot, 100, "2026-01-31", CacheMode::CacheOnly)
+    }
+}
+
+#[async_trait::async_trait]
+impl OntologyAdapter for SNOMEDAdapter {
+    async fn resolve_atom(&self, code: &str) -> Result<Atom, OntologyError> {
+        // Check L1 cache first
+        {
+            let mut cache = self.cache.lock().await;
+            if let Some(atom) = cache.get(code) {
+                return Ok(atom.clone());
+            }
+        }
+
+        // Fallback to offline snapshot
+        if let Some(atom) = self.snapshot.get(code).cloned() {
+            // Update cache on hit
+            let mut cache = self.cache.lock().await;
+            cache.put(code.to_string(), atom.clone());
+            return Ok(atom);
+        }
+
+        // Not found
+        Err(OntologyError::CodeNotFound {
+            code: code.to_string(),
+            system: OntologySystem::SNOMED,
+        })
+    }
+
+    fn ontology_version(&self) -> &str {
+        &self.version
+    }
+
+    fn cache_mode(&self) -> CacheMode {
+        self.mode
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,5 +501,95 @@ mod tests {
         fn cache_mode(&self) -> CacheMode {
             CacheMode::CacheOnly
         }
+    }
+
+    // SNOMEDAdapter tests
+    #[tokio::test]
+    async fn test_snomed_adapter_resolve_success() {
+        let adapter = SNOMEDAdapter::test_adapter();
+        let atom = adapter.resolve_atom("67822003").await;
+        assert!(atom.is_ok());
+        let atom = atom.unwrap();
+        assert_eq!(atom.code, "67822003");
+        assert_eq!(atom.preferred_term, "Hypoxemia");
+        assert_eq!(atom.system, OntologySystem::SNOMED);
+    }
+
+    #[tokio::test]
+    async fn test_snomed_adapter_resolve_not_found() {
+        let adapter = SNOMEDAdapter::test_adapter();
+        let result = adapter.resolve_atom("999999999").await;
+        assert!(result.is_err());
+        match result {
+            Err(OntologyError::CodeNotFound { code, system }) => {
+                assert_eq!(code, "999999999");
+                assert_eq!(system, OntologySystem::SNOMED);
+            }
+            _ => panic!("Expected CodeNotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_snomed_adapter_cache_behavior() {
+        let adapter = SNOMEDAdapter::test_adapter();
+
+        // First call loads from snapshot
+        let atom1 = adapter.resolve_atom("67822003").await.unwrap();
+
+        // Second call should come from cache (no snapshot access, but same result)
+        let atom2 = adapter.resolve_atom("67822003").await.unwrap();
+
+        assert_eq!(atom1, atom2);
+        assert_eq!(atom1.code, "67822003");
+    }
+
+    #[tokio::test]
+    async fn test_snomed_adapter_version() {
+        let adapter = SNOMEDAdapter::test_adapter();
+        assert_eq!(adapter.ontology_version(), "2026-01-31");
+    }
+
+    #[tokio::test]
+    async fn test_snomed_adapter_cache_mode() {
+        let adapter = SNOMEDAdapter::test_adapter();
+        assert_eq!(adapter.cache_mode(), CacheMode::CacheOnly);
+    }
+
+    #[tokio::test]
+    async fn test_snomed_adapter_multiple_codes() {
+        let adapter = SNOMEDAdapter::test_adapter();
+
+        // Test three different SNOMED codes from the fixture
+        let hypoxemia = adapter.resolve_atom("67822003").await.unwrap();
+        assert_eq!(hypoxemia.preferred_term, "Hypoxemia");
+
+        let ards = adapter.resolve_atom("3723001").await.unwrap();
+        assert_eq!(ards.preferred_term, "Acute respiratory distress syndrome");
+
+        let resp_distress = adapter.resolve_atom("29303001").await.unwrap();
+        assert_eq!(resp_distress.preferred_term, "Respiratory distress");
+
+        // All should have the same version
+        assert_eq!(hypoxemia.version, "2026-01-31");
+        assert_eq!(ards.version, "2026-01-31");
+        assert_eq!(resp_distress.version, "2026-01-31");
+    }
+
+    #[test]
+    fn test_snomed_adapter_compatibility() {
+        let adapter = SNOMEDAdapter::test_adapter();
+        let atom1 = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom2 = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        assert!(adapter.validate_compatibility(&atom1, &atom2));
     }
 }

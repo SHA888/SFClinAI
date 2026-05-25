@@ -79,7 +79,9 @@ pub mod sofa;
 
 pub use abstain::AbstainReason;
 pub use hyp::{AtomId, Hyp};
-pub use ontology::{Atom, CacheMode, OntologyAdapter, OntologyError, OntologySystem};
+pub use ontology::{
+    Atom, CacheMode, OntologyAdapter, OntologyError, OntologySystem, SNOMEDAdapter,
+};
 pub use operator::Operator;
 pub use outcome::Outcome;
 pub use sofa::{SofaRespEvidence, SofaRespHypothesis, SofaRespOperator};
