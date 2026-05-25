@@ -2,6 +2,15 @@
 .claude/
 .harness-mem/
 CLAUDE.md
+out/
+
+# Rust / Cargo
+/target/
+Cargo.lock
+**/*.rs.bk
+*.rlib
+*.so
+*.dylib
 
 # IDE and editor files
 .vscode/
