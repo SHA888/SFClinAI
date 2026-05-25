@@ -626,6 +626,125 @@ impl OntologyAdapter for LoincAdapter {
     }
 }
 
+/// ICD-11 diagnostic classification ontology adapter with in-memory LRU cache and offline snapshot fallback.
+///
+/// Per [DESIGN-D2][1] and [SPEC.md DEF-PS-03][2]:
+/// Icd11Adapter resolves ICD-11 codes to atoms using an in-memory LRU cache backed by
+/// an offline snapshot. ICD-11 codes (e.g., "BB81.1" for acute kidney injury) identify
+/// diagnoses and conditions per WHO's International Classification of Diseases, 11th Revision.
+/// In M1, snapshots are hand-coded test data. Real ICD-11 API integration (if needed) defers to M5+.
+///
+/// [1]: https://github.com/SHA888/SFClinAI/blob/main/DESIGN-D2-ontology.md
+/// [2]: https://github.com/SHA888/SFClinAI/blob/main/SPEC.md#def-ps-03
+pub struct Icd11Adapter {
+    /// In-memory LRU cache for frequently accessed diagnosis codes.
+    cache: std::sync::Arc<tokio::sync::Mutex<lru::LruCache<String, Atom>>>,
+    /// Offline snapshot: pre-loaded ICD-11 codes.
+    snapshot: std::sync::Arc<std::collections::HashMap<String, Atom>>,
+    /// ICD-11 release version (e.g., "2024-11").
+    version: String,
+    /// Caching mode for this adapter.
+    mode: CacheMode,
+}
+
+impl Icd11Adapter {
+    /// Create a new Icd11Adapter.
+    ///
+    /// # Arguments
+    /// * `snapshot` - Pre-loaded ICD-11 codes as a HashMap.
+    /// * `cache_size` - LRU cache capacity (e.g., 10000 for typical pilot).
+    /// * `version` - ICD-11 release version (e.g., "2024-11").
+    /// * `mode` - Caching mode (CacheOnly for M1 with in-memory snapshots).
+    pub fn new(
+        snapshot: std::collections::HashMap<String, Atom>,
+        cache_size: usize,
+        version: impl Into<String>,
+        mode: CacheMode,
+    ) -> Self {
+        Icd11Adapter {
+            cache: std::sync::Arc::new(tokio::sync::Mutex::new(lru::LruCache::new(
+                std::num::NonZeroUsize::new(cache_size).unwrap(),
+            ))),
+            snapshot: std::sync::Arc::new(snapshot),
+            version: version.into(),
+            mode,
+        }
+    }
+
+    /// Create a test adapter with standard ICD-11 examples.
+    ///
+    /// This is a convenience constructor for testing. Loads three standard ICD-11 codes
+    /// representing diagnoses relevant to critical care and the worked examples in NOTE.md.
+    #[cfg(test)]
+    pub fn test_adapter() -> Self {
+        let mut snapshot = std::collections::HashMap::new();
+        snapshot.insert(
+            "BA47".to_string(),
+            Atom {
+                system: OntologySystem::ICD11,
+                code: "BA47".to_string(),
+                preferred_term: "Essential (primary) hypertension".to_string(),
+                version: "2024-11".to_string(),
+            },
+        );
+        snapshot.insert(
+            "BB81.1".to_string(),
+            Atom {
+                system: OntologySystem::ICD11,
+                code: "BB81.1".to_string(),
+                preferred_term: "Acute kidney injury".to_string(),
+                version: "2024-11".to_string(),
+            },
+        );
+        snapshot.insert(
+            "BA80.31".to_string(),
+            Atom {
+                system: OntologySystem::ICD11,
+                code: "BA80.31".to_string(),
+                preferred_term: "Type 2 diabetes mellitus".to_string(),
+                version: "2024-11".to_string(),
+            },
+        );
+
+        Icd11Adapter::new(snapshot, 100, "2024-11", CacheMode::CacheOnly)
+    }
+}
+
+#[async_trait::async_trait]
+impl OntologyAdapter for Icd11Adapter {
+    async fn resolve_atom(&self, code: &str) -> Result<Atom, OntologyError> {
+        // Check L1 cache first
+        {
+            let mut cache = self.cache.lock().await;
+            if let Some(atom) = cache.get(code) {
+                return Ok(atom.clone());
+            }
+        }
+
+        // Fallback to offline snapshot
+        if let Some(atom) = self.snapshot.get(code).cloned() {
+            // Update cache on hit
+            let mut cache = self.cache.lock().await;
+            cache.put(code.to_string(), atom.clone());
+            return Ok(atom);
+        }
+
+        // Not found
+        Err(OntologyError::CodeNotFound {
+            code: code.to_string(),
+            system: OntologySystem::ICD11,
+        })
+    }
+
+    fn ontology_version(&self) -> &str {
+        &self.version
+    }
+
+    fn cache_mode(&self) -> CacheMode {
+        self.mode
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1019,6 +1138,99 @@ mod tests {
             code: "2160-0".to_string(),
             preferred_term: "Creatinine [Mass/volume] in Serum or Plasma".to_string(),
             version: "2.76".to_string(),
+        };
+        assert!(adapter.validate_compatibility(&atom1, &atom2));
+    }
+
+    // Icd11Adapter tests
+    #[tokio::test]
+    async fn test_icd11_adapter_resolve_success() {
+        let adapter = Icd11Adapter::test_adapter();
+        let atom = adapter.resolve_atom("BA47").await;
+        assert!(atom.is_ok());
+        let atom = atom.unwrap();
+        assert_eq!(atom.code, "BA47");
+        assert_eq!(atom.preferred_term, "Essential (primary) hypertension");
+        assert_eq!(atom.system, OntologySystem::ICD11);
+    }
+
+    #[tokio::test]
+    async fn test_icd11_adapter_resolve_not_found() {
+        let adapter = Icd11Adapter::test_adapter();
+        let result = adapter.resolve_atom("ZZ99").await;
+        assert!(result.is_err());
+        match result {
+            Err(OntologyError::CodeNotFound { code, system }) => {
+                assert_eq!(code, "ZZ99");
+                assert_eq!(system, OntologySystem::ICD11);
+            }
+            _ => panic!("Expected CodeNotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_icd11_adapter_cache_behavior() {
+        let adapter = Icd11Adapter::test_adapter();
+
+        // First call loads from snapshot
+        let atom1 = adapter.resolve_atom("BA47").await.unwrap();
+
+        // Second call should come from cache
+        let atom2 = adapter.resolve_atom("BA47").await.unwrap();
+
+        assert_eq!(atom1, atom2);
+        assert_eq!(atom1.code, "BA47");
+    }
+
+    #[tokio::test]
+    async fn test_icd11_adapter_version() {
+        let adapter = Icd11Adapter::test_adapter();
+        assert_eq!(adapter.ontology_version(), "2024-11");
+    }
+
+    #[tokio::test]
+    async fn test_icd11_adapter_cache_mode() {
+        let adapter = Icd11Adapter::test_adapter();
+        assert_eq!(adapter.cache_mode(), CacheMode::CacheOnly);
+    }
+
+    #[tokio::test]
+    async fn test_icd11_adapter_multiple_codes() {
+        let adapter = Icd11Adapter::test_adapter();
+
+        // Test three different ICD-11 codes from the fixture
+        let hypertension = adapter.resolve_atom("BA47").await.unwrap();
+        assert_eq!(
+            hypertension.preferred_term,
+            "Essential (primary) hypertension"
+        );
+
+        let aki = adapter.resolve_atom("BB81.1").await.unwrap();
+        assert_eq!(aki.preferred_term, "Acute kidney injury");
+
+        let diabetes = adapter.resolve_atom("BA80.31").await.unwrap();
+        assert_eq!(diabetes.preferred_term, "Type 2 diabetes mellitus");
+
+        // All should have the same version
+        assert_eq!(hypertension.version, "2024-11");
+        assert_eq!(aki.version, "2024-11");
+        assert_eq!(diabetes.version, "2024-11");
+    }
+
+    #[test]
+    fn test_icd11_adapter_compatibility() {
+        let adapter = Icd11Adapter::test_adapter();
+        let atom1 = Atom {
+            system: OntologySystem::ICD11,
+            code: "BA47".to_string(),
+            preferred_term: "Essential (primary) hypertension".to_string(),
+            version: "2024-11".to_string(),
+        };
+        let atom2 = Atom {
+            system: OntologySystem::ICD11,
+            code: "BA47".to_string(),
+            preferred_term: "Essential (primary) hypertension".to_string(),
+            version: "2024-11".to_string(),
         };
         assert!(adapter.validate_compatibility(&atom1, &atom2));
     }

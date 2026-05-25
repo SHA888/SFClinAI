@@ -80,8 +80,8 @@ pub mod sofa;
 pub use abstain::AbstainReason;
 pub use hyp::{AtomId, Hyp};
 pub use ontology::{
-    Atom, CacheMode, LoincAdapter, OntologyAdapter, OntologyError, OntologySystem, RxNormAdapter,
-    SNOMEDAdapter,
+    Atom, CacheMode, Icd11Adapter, LoincAdapter, OntologyAdapter, OntologyError, OntologySystem,
+    RxNormAdapter, SNOMEDAdapter,
 };
 pub use operator::Operator;
 pub use outcome::Outcome;
