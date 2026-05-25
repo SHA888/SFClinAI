@@ -459,3 +459,196 @@ These are stated, not discharged. Discharge mechanism (mechanized proof, propert
 ---
 
 _End of §2._
+
+## §3. Institutional-state substrate
+
+Formalizes `NOTE.md` §4B. This section defines the structure within which an institution's resource-allocation state is represented, updated under operational events, and operated on. The structure parallels §2 by design — `NOTE.md` §4B mirrors §4A — and shared abstractions from §1 are reused.
+
+Three structural differences from §2 are load-bearing and surfaced as they arise:
+
+- The institutional substrate is **one per institution**, shared across patients (versus per-patient for §2).
+- Its state is subject to **hard physical constraints** (bed counts, formulary supply, lab cycle times) that are not negotiable by refinement.
+- Its observation space carries **resource events** (admissions, discharges, deliveries, shift changes) rather than per-patient clinical observations.
+
+### §3.1. Institutional state space
+
+**DEF-IS-01 (Institutional state space).** [formalizes: `NOTE.md` §4B.1]
+
+An _institutional state space_ is a triple `H_IS = (Cap, ⊑_IS, compat_IS)` where:
+
+- `Cap` is a set of _capacity hypotheses_. A capacity hypothesis is a constrained assignment of resources to potential commitments: bed allocations, formulary holds, lab-queue positions, on-call assignments. Concrete representation in §3.2.
+- `⊑_IS` is a partial order on `Cap`. `c₁ ⊑_IS c₂` reads "c₁ is at least as committed as c₂" — more allocations made, fewer degrees of freedom remaining.
+- `compat_IS` is a compatibility predicate. Two capacity hypotheses are compatible iff their union does not exceed any physical capacity bound (DEF-IS-04).
+
+`H_IS` is a partial-meet poset (MC-1). Meets correspond to consolidating two compatible allocation views. ∎
+
+**DEF-IS-02 (Top institutional hypothesis).** [formalizes: `NOTE.md` §4B.1]
+
+`Cap` contains a distinguished element `⊤_IS` (read: "fully uncommitted") such that ∀ c ∈ Cap. c ⊑_IS ⊤_IS. This represents a hypothetical state with all resources available; it is the upper reference point, never the actual institutional state in operation. ∎
+
+**INV-IS-01 (Compatibility under refinement).** [formalizes: `NOTE.md` §4B.2]
+
+If `c₁ ⊑_IS c₂` and `compat_IS(c₂, c₃)`, then `compat_IS(c₁, c₃)`. Mirrors INV-PS-01. ∎
+
+**INV-IS-02 (Meet via refinement).** For compatible `c₁, c₂`, the meet `c₁ ⊓_IS c₂` is the unique most-uncommitted capacity hypothesis that is at least as committed as both. Mirrors INV-PS-02. ∎
+
+### §3.2. Scope-bounded resources and physical capacity bounds
+
+**DEF-IS-03 (Resource-bounded set).** [formalizes: `NOTE.md` §4B.3]
+
+A _resource-bounded set_ `R` is the institutional analog of the ontology-bounded set (DEF-PS-03). It is an `OntologyBoundedSet`-typed enumeration of:
+
+- Physical resource units (bed identifiers, ICU bays, OR rooms, ventilators).
+- Consumable resource classes (formulary items, lab reagents).
+- Time-divisible resource slots (lab queue positions, OR block hours, on-call shifts).
+- Personnel role assignments (specialist coverage, nursing ratios).
+
+Each resource type carries a version identifier and source attribution. Concrete bindings to specific hospital information systems are out of scope per §0.5. ∎
+
+**DEF-IS-04 (Physical capacity bound).** [formalizes: `NOTE.md` §4B.1, "hard physical limits"]
+
+A _physical capacity bound_ is a function `cap : R → ℕ` (or `ℕ ∪ {∞}` for unbounded resources) giving the maximum simultaneous instances of each resource available.
+
+`cap` is itself versioned (`ver(cap) : Ver`) and changes only through operator-mediated updates (§3.4) — for example, when a bay opens, a unit closes, or formulary supply is delivered.
+
+A capacity hypothesis `c ∈ Cap` is _physically valid_ iff its committed-resource count for each `r ∈ R` does not exceed `cap(r)`. ∎
+
+**OBL-IS-01 (Physical validity preservation).** [formalizes: `NOTE.md` §4B.1, §4B.2]
+
+Every operator in §3.4 must preserve physical validity: applying an operator to a physically-valid input cannot produce a physically-invalid output. Operators that would violate `cap` must abstain (DEF-IS-10). ∎
+
+**OBL-IS-02 (Resource decidability).** [formalizes: `NOTE.md` §4B.3]
+
+Membership in `R` is decidable. Free-form resource identifiers cannot enter `Cap`. ∎
+
+### §3.3. Institutional event space and Galois connection
+
+**DEF-IS-05 (Institutional event space).** [formalizes: `NOTE.md` §4B.1, concrete side]
+
+The _institutional event space_ `Evt_IS = (Evt, ⊑_Evt)` is a poset where `Evt` is the set of timestamped, provenance-tagged _operational events_ — admissions, discharges, transfers, supply deliveries, shift changes, allocation requests, allocation releases.
+
+`e₁ ⊑_Evt e₂` iff `e₁`'s event multiset is a superset of `e₂`'s: more events observed implies a more-refined event history. ∎
+
+**DEF-IS-06 (Institutional Galois connection).** [formalizes: `NOTE.md` §4B.1]
+
+The _institutional Galois connection_ is `(Evt_IS, α_IS, γ_IS, H_IS)` where:
+
+- `α_IS : Evt → Cap` maps an event history to the most-committed capacity hypothesis it entails.
+- `γ_IS : Cap → Evt` maps a capacity hypothesis to the set of event histories consistent with it.
+
+Satisfies DEF-MP-08. ∎
+
+**OBL-IS-03 (Institutional adjunction soundness).** Mirrors OBL-PS-02.
+
+∀ e ∈ Evt, c ∈ Cap. α_IS(e) ⊑_IS c ⟺ e ⊑_Evt γ_IS(c) ∎
+
+### §3.4. Capacity-update operators
+
+**DEF-IS-07 (Capacity-update operator signature).** [formalizes: `NOTE.md` §4B.2]
+
+A _capacity-update operator_ is a function
+
+`δ_IS : Cap × InstEvidence → Result⟨Cap, AbstainReason_IS⟩`
+
+where `InstEvidence` is a typed evidence packet over the institutional event space (an element of `Evt` with provenance), and `AbstainReason_IS` is defined in §3.5. ∎
+
+**DEF-IS-08 (Soundness of a capacity-update operator).** [formalizes: `NOTE.md` §4B.2, "sound"]
+
+A capacity-update operator `δ_IS` is _sound_ iff, for all `c ∈ Cap` and evidence packets `e_inst` carrying event multiset `evt ∈ Evt`:
+
+If `δ_IS(c, e_inst) = Refined(c')`, then:
+
+1. `c' ⊑_IS c` (operator only refines — only commits, never un-commits without a corresponding event).
+2. `c' ⊑_IS α_IS(evt)` (refinement is at most as committed as the events justify).
+3. `c'` is physically valid (OBL-IS-01). ∎
+
+**INV-IS-03 (Capacity-update monotonicity).** [formalizes: `NOTE.md` §4B.2]
+
+For any sound `δ_IS`: `δ_IS(c, e) = Refined(c') ⟹ c' ⊑_IS c`. Half of DEF-IS-08, called out separately. ∎
+
+**DEF-IS-09 (Institutional operator set).** [formalizes: `NOTE.md` §4B.2]
+
+The _institutional operator set_ is a finite, named, versioned set `Δ_IS = {(name_i, δ_IS_i, ver_i)}` where each operator satisfies DEF-IS-08.
+
+`Δ_IS` is itself versioned. Changes follow §5. ∎
+
+**OBL-IS-04 (Institutional operator-set soundness).** Mirrors OBL-PS-03. Every `δ_IS_i ∈ Δ_IS` satisfies DEF-IS-08. ∎
+
+### §3.5. Allocation abstention
+
+**DEF-IS-10 (Institutional abstention reason).** [formalizes: `NOTE.md` §4B.4]
+
+`AbstainReason_IS = `
+`CapacityExceeded(resource: R, demand: ℕ, available: ℕ)`
+`| DemandUncertain(forecast_ci: ConfidenceInterval, threshold_breached: ThresholdId)`
+`| AllocationContested(stakeholders: Set⟨StakeholderId⟩, rationale: Prov)`
+`| EventOutOfScope(event_ids: Set⟨EventId⟩)`
+`| OperatorPreconditionUnmet(operator: OperatorName, condition: PreconditionId)`
+`| PhysicalValidityWouldBeViolated(violations: Set⟨ResourceBreach⟩)`
+
+Mirrors DEF-PS-10 in structure: every abstention is machine-classifiable, no free-text reasons. The `PhysicalValidityWouldBeViolated` variant is institution-specific — it has no counterpart in `AbstainReason_PS` because the patient substrate has no equivalent hard physical bound. ∎
+
+**INV-IS-04 (Institutional abstention is sound).** Mirrors INV-PS-04. ∎
+
+**DEF-IS-11 (Allocation abstention is not stalling).** [formalizes: `NOTE.md` §4B.4, "first-class output"]
+
+`Abstain(r)` for an allocation decision means the substrate has explicitly produced a non-decision, with a machine-readable reason and a provenance trail. It is _not_ the same as the operator timing out, crashing, or silently producing a default allocation. The substrate guarantees that every allocation request yields either `Refined(c')` or `Abstain(r)` in bounded steps — never silent failure. (Bounded-time guarantees themselves are an architectural concern; here we require only that the abstention path is structurally reachable.) ∎
+
+### §3.6. Provenance integration
+
+The provenance machinery is shared with the patient substrate. Section §2.6 definitions apply with substrate-appropriate type substitutions; only delta-relevant statements appear here.
+
+**DEF-IS-12 (Institutional evidence packet).** Mirrors DEF-PS-12: `InstEvidence = Evt^P`. Every event entering an operator carries provenance. ∎
+
+**DEF-IS-13 (Institutional operator output with provenance).** Mirrors DEF-PS-13:
+
+`δ_IS : Cap^P × InstEvidence → Result⟨Cap^P, AbstainReason_IS⟩^P` ∎
+
+**INV-IS-05 (Institutional provenance closure).** Mirrors INV-PS-05. ∎
+
+**OBL-IS-05 (Institutional provenance auditability).** Mirrors OBL-PS-04. ∎
+
+### §3.7. The capacity-learned proposer
+
+**DEF-IS-14 (Capacity-learned proposer signature).** [formalizes: `NOTE.md` §4B.5, "demand forecasters, queue dynamics predictors"]
+
+A _capacity-learned proposer_ is a function
+
+`π_IS : Cap^P × InstEvidence → Set⟨Cap⟩`
+
+returning a finite set of candidate capacity refinements. The proposer integrates learned components: demand forecasters, queue-dynamics predictors, length-of-stay regressors, no-show classifiers.
+
+As in DEF-PS-14, the proposer does **not** decide — it produces candidates for the capacity-update operators in §3.4 to evaluate. ∎
+
+**DEF-IS-15 (Institutional proposer codomain constraint).** [formalizes: `NOTE.md` §4B.5, "constrained"]
+
+Every candidate `c ∈ π_IS(...)` must satisfy:
+
+1. Resource-boundedness (DEF-IS-03): all referenced resources are members of `R`.
+2. Physical validity under current `cap` (DEF-IS-04).
+3. At-most-one-step refinement under `⊑_IS` (defined analogously to DEF-PS-15.2: there exists `δ_IS ∈ Δ_IS` that could plausibly produce this refinement from the input evidence).
+
+Candidates failing any constraint are filtered before reaching the operators. ∎
+
+**INV-IS-06 (Institutional proposer cannot bypass soundness).** [formalizes: `NOTE.md` §4B.5, "constrained"]
+
+The active institutional state cannot be modified except through a sound capacity-update operator. Even if `π_IS` is adversarial, the soundness and physical validity of `Cap^P` depend only on `Δ_IS`, not on `π_IS`. Mirrors INV-PS-06. ∎
+
+**OBL-IS-06 (Institutional proposer-operator separation).** Mirrors OBL-PS-05. ∎
+
+### §3.8. Summary of institutional-substrate proof obligations
+
+Consolidated from §3.1–§3.7; cross-listed in §6:
+
+- **OBL-IS-01** — Physical validity preservation across operator application.
+- **OBL-IS-02** — Resource decidability.
+- **OBL-IS-03** — Adjunction soundness of `(α_IS, γ_IS)`.
+- **OBL-IS-04** — Every operator in `Δ_IS` satisfies DEF-IS-08.
+- **OBL-IS-05** — Institutional provenance auditability.
+- **OBL-IS-06** — Institutional proposer-operator separation enforced structurally.
+
+The institutional substrate inherits the patient substrate's separation discipline (proposer vs. operator) and adds one institution-specific obligation (OBL-IS-01, physical validity). All six are stated, not discharged.
+
+---
+
+_End of §3._
