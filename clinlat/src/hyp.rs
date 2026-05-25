@@ -3,33 +3,27 @@
 //! A `Hyp` represents a set of clinical hypotheses at some level of refinement.
 //! Hypotheses are ordered by refinement: a hypothesis h1 refines h2 (h1 ≤ h2) if h1 is more specific.
 //!
-//! # v0.1.0 Simplification
-//!
-//! `AtomId` is `&'static str` (static string reference).
-//! Real ontology binding (SNOMED CT, RxNorm, LOINC, ICD-11) is deferred to v0.2 (DEF-PS-03).
+//! Per [SPEC.md § 2] (DEF-PS-01, INV-PS-02):
+//! Hypotheses are formalized as sets of resolved atoms from external ontologies (SNOMED CT, RxNorm, LOINC, ICD-11).
+//! Atoms replace the v0.1.0 `&'static str` placeholder, enabling real ontology binding and audit trail support.
 
+use crate::ontology::Atom;
 use std::cmp::Ordering;
 
-/// Atom identifier: a clinical concept or observation label.
-///
-/// In v0.1.0, atoms are static string references.
-/// In v0.2.0+, atoms will be bound to external ontologies (SNOMED CT, RxNorm, LOINC, ICD-11).
-pub type AtomId = &'static str;
-
-/// A clinical hypothesis: a refinable set of atoms.
+/// A clinical hypothesis: a refinable set of resolved atoms.
 ///
 /// Hypotheses are ordered by refinement: `h1 ≤ h2` means h1 is more specific (refines) h2.
 /// This ordering forms a partially ordered set (poset) where:
 /// - `Unknown` is the top element (least specific).
-/// - Each concrete hypothesis (e.g., `SOFA_Score3`) is more specific.
+/// - Each concrete hypothesis carries resolved `Atom` payloads from external ontologies.
 ///
 /// Implements DEF-PS-01 (refinement order) and INV-PS-02 (partial meet).
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Hyp(Vec<AtomId>);
+pub struct Hyp(Vec<Atom>);
 
 impl Hyp {
     /// Creates a new hypothesis from a list of atoms.
-    pub fn new(atoms: Vec<AtomId>) -> Self {
+    pub fn new(atoms: Vec<Atom>) -> Self {
         Hyp(atoms)
     }
 
@@ -43,10 +37,8 @@ impl Hyp {
     /// Two hypotheses are compatible if they can coexist (neither contradicts the other).
     /// Implements DEF-PS-01 compatibility predicate.
     ///
-    /// # v0.1.0 Definition
-    ///
     /// Two hypotheses are compatible if they are equal or if at least one is `Unknown`.
-    /// In v0.2.0+, compatibility will be determined by ontological constraints.
+    /// In future versions, compatibility may be determined by ontological constraints.
     pub fn compat(&self, other: &Hyp) -> bool {
         self == other || self.is_unknown() || other.is_unknown()
     }
@@ -58,13 +50,11 @@ impl Hyp {
     ///
     /// Implements INV-PS-02 (meet operation).
     ///
-    /// # v0.1.0 Definition
-    ///
     /// - If h1 and h2 are equal, their meet is h1.
     /// - If one is `Unknown`, the meet is the other.
     /// - Otherwise, no meet exists (returns `None`).
     ///
-    /// In v0.2.0+, meet will be determined by lattice structure over the ontology.
+    /// In future versions, meet will be determined by lattice structure over the ontology.
     pub fn meet(&self, other: &Hyp) -> Option<Hyp> {
         if self == other {
             return Some(self.clone());
@@ -84,7 +74,7 @@ impl Hyp {
     }
 
     /// Returns the atoms in this hypothesis.
-    pub fn atoms(&self) -> &[AtomId] {
+    pub fn atoms(&self) -> &[Atom] {
         &self.0
     }
 }
@@ -116,11 +106,39 @@ impl PartialOrd for Hyp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ontology::OntologySystem;
+
+    fn atom_diagnosis_a() -> Atom {
+        Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        }
+    }
+
+    fn atom_diagnosis_b() -> Atom {
+        Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "Acute respiratory distress syndrome".to_string(),
+            version: "2026-01-31".to_string(),
+        }
+    }
+
+    fn atom_severity_high() -> Atom {
+        Atom {
+            system: OntologySystem::SNOMED,
+            code: "24484000".to_string(),
+            preferred_term: "Severe".to_string(),
+            version: "2026-01-31".to_string(),
+        }
+    }
 
     #[test]
     fn test_unknown_top_element() {
         let unknown = Hyp::unknown();
-        let hyp = Hyp::new(vec!["diagnosis_a"]);
+        let hyp = Hyp::new(vec![atom_diagnosis_a()]);
 
         // Any hypothesis refines (is more specific than) Unknown.
         assert_eq!(hyp.partial_cmp(&unknown), Some(Ordering::Less));
@@ -130,8 +148,10 @@ mod tests {
 
     #[test]
     fn test_equal_hypotheses() {
-        let h1 = Hyp::new(vec!["diagnosis_a", "severity_high"]);
-        let h2 = Hyp::new(vec!["diagnosis_a", "severity_high"]);
+        let atom_a = atom_diagnosis_a();
+        let atom_s = atom_severity_high();
+        let h1 = Hyp::new(vec![atom_a.clone(), atom_s.clone()]);
+        let h2 = Hyp::new(vec![atom_a, atom_s]);
 
         assert_eq!(h1.partial_cmp(&h2), Some(Ordering::Equal));
         assert!(h1.compat(&h2));
@@ -139,8 +159,8 @@ mod tests {
 
     #[test]
     fn test_incomparable_hypotheses() {
-        let h1 = Hyp::new(vec!["diagnosis_a"]);
-        let h2 = Hyp::new(vec!["diagnosis_b"]);
+        let h1 = Hyp::new(vec![atom_diagnosis_a()]);
+        let h2 = Hyp::new(vec![atom_diagnosis_b()]);
 
         // Incomparable hypotheses have no ordering relationship.
         assert_eq!(h1.partial_cmp(&h2), None);
@@ -151,7 +171,7 @@ mod tests {
     #[test]
     fn test_compat_with_unknown() {
         let unknown = Hyp::unknown();
-        let hyp = Hyp::new(vec!["diagnosis_a"]);
+        let hyp = Hyp::new(vec![atom_diagnosis_a()]);
 
         // Any hypothesis is compatible with Unknown.
         assert!(hyp.compat(&unknown));
@@ -160,8 +180,9 @@ mod tests {
 
     #[test]
     fn test_meet_equal_hypotheses() {
-        let h1 = Hyp::new(vec!["diagnosis_a"]);
-        let h2 = Hyp::new(vec!["diagnosis_a"]);
+        let atom = atom_diagnosis_a();
+        let h1 = Hyp::new(vec![atom.clone()]);
+        let h2 = Hyp::new(vec![atom]);
 
         assert_eq!(h1.meet(&h2), Some(h1.clone()));
     }
@@ -169,7 +190,7 @@ mod tests {
     #[test]
     fn test_meet_with_unknown() {
         let unknown = Hyp::unknown();
-        let hyp = Hyp::new(vec!["diagnosis_a"]);
+        let hyp = Hyp::new(vec![atom_diagnosis_a()]);
 
         // Meet of any hypothesis with Unknown is the hypothesis itself.
         assert_eq!(hyp.meet(&unknown), Some(hyp.clone()));
@@ -178,8 +199,8 @@ mod tests {
 
     #[test]
     fn test_meet_incomparable_none() {
-        let h1 = Hyp::new(vec!["diagnosis_a"]);
-        let h2 = Hyp::new(vec!["diagnosis_b"]);
+        let h1 = Hyp::new(vec![atom_diagnosis_a()]);
+        let h2 = Hyp::new(vec![atom_diagnosis_b()]);
 
         // Incomparable hypotheses have no meet.
         assert_eq!(h1.meet(&h2), None);

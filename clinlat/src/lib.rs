@@ -78,7 +78,7 @@ pub mod outcome;
 pub mod sofa;
 
 pub use abstain::AbstainReason;
-pub use hyp::{AtomId, Hyp};
+pub use hyp::Hyp;
 pub use ontology::{
     Atom, CacheMode, Icd11Adapter, LoincAdapter, OntologyAdapter, OntologyError, OntologySystem,
     RxNormAdapter, SNOMEDAdapter,
