@@ -6,5 +6,6 @@ rust-version = "1.86.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/SHA888/SFClinAI"
 documentation = "https://docs.rs/clinlat"
+description = "A symbolic substrate for clinical decision-making based on refinable hypothesis lattices and sound deduction operators"
 
 [dependencies]
