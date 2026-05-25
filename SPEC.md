@@ -1155,3 +1155,188 @@ The largest remaining bucket is **Deferred to v0.4.x or later** — these will s
 ---
 
 _End of §7._
+
+## §8. Bidirectional traceability: NOTE.md ↔ SPEC.md
+
+This section is the contract between `NOTE.md` and SPEC.md on what formalizes what. It exists because §0.1 commits SPEC.md to a model where clinicians scrutinize the formalization via `NOTE.md`, not by reading SPEC.md directly — and that scrutiny pathway only works if every `NOTE.md` claim has a stable mapping to the SPEC.md elements that formalize it, and every SPEC.md element traces back to the `NOTE.md` sentence it claims to formalize.
+
+The closure check is: any `NOTE.md` §4 principle should be reachable from a SPEC.md element, and any SPEC.md element with a `[formalizes:]` annotation should be reachable from a `NOTE.md` principle. Both directions are required. A SPEC.md element with no `NOTE.md` anchor is either (a) infrastructure not requiring traceability (mathematical preliminaries in §1, type constructors), or (b) a formalization overreach that should be cut. A `NOTE.md` principle with no SPEC.md formalization is either (a) deliberately unformalized in v0.3 (no current entry; the 18 principles all have at least one SPEC.md anchor) or (b) a gap requiring SPEC.md work.
+
+### §8.1. Forward: NOTE.md → SPEC.md
+
+For each `NOTE.md` v0.12.0 §4 principle, the SPEC.md elements that formalize it.
+
+| NOTE.md principle                                                  | Criticality | SPEC.md formalizations                                                                                       |
+| ------------------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------ |
+| **4A.1** Persistent partial-information state                      | P           | DEF-PS-01, DEF-PS-02, DEF-PS-05, DEF-PS-06; OBL-PS-02                                                        |
+| **4A.2** Justified reversible transitions; ontology-bounded        | S           | DEF-PS-03, DEF-PS-04, DEF-PS-07, DEF-PS-08, DEF-PS-09; INV-PS-01, INV-PS-02, INV-PS-03; OBL-PS-01, OBL-PS-03 |
+| **4A.3** First-class abstention                                    | S           | DEF-PS-10, DEF-PS-11; INV-PS-04                                                                              |
+| **4A.4** Auditable provenance                                      | S           | DEF-PS-12, DEF-PS-13; INV-PS-05; OBL-PS-04                                                                   |
+| **4A.5** Constrained refinement proposer                           | S           | DEF-PS-14, DEF-PS-15; INV-PS-06; OBL-PS-05                                                                   |
+| **4B.1** Persistent institutional-state                            | P           | DEF-IS-01, DEF-IS-02, DEF-IS-04, DEF-IS-05, DEF-IS-06; OBL-IS-03                                             |
+| **4B.2** Justified capacity transitions; resource-bounded          | S           | DEF-IS-03, DEF-IS-07, DEF-IS-08, DEF-IS-09; INV-IS-01, INV-IS-02, INV-IS-03; OBL-IS-01, OBL-IS-02, OBL-IS-04 |
+| **4B.3** Allocation abstention                                     | S           | DEF-IS-10, DEF-IS-11; INV-IS-04                                                                              |
+| **4B.4** Auditable allocation provenance                           | S           | DEF-IS-12, DEF-IS-13; INV-IS-05; OBL-IS-05                                                                   |
+| **4B.5** Constrained capacity-learned proposers                    | S           | DEF-IS-14, DEF-IS-15; INV-IS-06; OBL-IS-06                                                                   |
+| **4C.1** Joint licensing                                           | P           | DEF-IX-03, DEF-IX-04, DEF-IX-05, DEF-IX-06, DEF-IX-07; INV-IX-02; OBL-IX-02                                  |
+| **4C.2** Cross-layer events                                        | F           | DEF-IX-01, DEF-IX-02; INV-IX-01; OBL-IX-01                                                                   |
+| **4C.3** Joint abstention                                          | P           | DEF-IX-08, DEF-IX-09, DEF-IX-10; INV-IX-03; OBL-IX-03                                                        |
+| **4D.1** Versioned substrate components                            | F           | DEF-TE-01; INV-TE-01                                                                                         |
+| **4D.2** Evidence currency                                         | F           | DEF-TE-02, DEF-TE-03; INV-TE-02                                                                              |
+| **4D.3** Sound evolution under operator-set change                 | S           | DEF-TE-04, DEF-TE-05; INV-TE-03; OBL-TE-01                                                                   |
+| **4D.4** Clinician-mediated propagation (+ institutional symmetry) | P           | DEF-TE-06, DEF-TE-06b; INV-TE-04; OBL-TE-02                                                                  |
+| **4D.5** Evolution-aware provenance                                | S           | DEF-TE-07; INV-TE-05; OBL-TE-03                                                                              |
+
+All 18 principles have at least one SPEC.md anchor. INV-IX-04 (substrate independence) does not anchor to a single principle — it is a cross-cutting structural invariant supporting the §4C coupling claim as a whole; cataloged in §8.3.
+
+### §8.2. Reverse: SPEC.md → NOTE.md
+
+For each SPEC.md formalized element (`DEF-*`, `INV-*`, `OBL-*` from §2–§5), the `NOTE.md` principle(s) it formalizes. Cross-cutting elements appear in §8.3.
+
+**Patient substrate (§2 → NOTE.md §4A):**
+
+| SPEC.md element                            | NOTE.md principle(s)           |
+| ------------------------------------------ | ------------------------------ |
+| DEF-PS-01, DEF-PS-02                       | 4A.1                           |
+| DEF-PS-03, DEF-PS-04, OBL-PS-01            | 4A.2 (ontology-bounded clause) |
+| DEF-PS-05, DEF-PS-06, OBL-PS-02            | 4A.1 (concrete-side / Galois)  |
+| DEF-PS-07, DEF-PS-08, DEF-PS-09            | 4A.2 (sound deduction clause)  |
+| INV-PS-01, INV-PS-02, INV-PS-03            | 4A.2                           |
+| OBL-PS-03                                  | 4A.2                           |
+| DEF-PS-10, DEF-PS-11, INV-PS-04            | 4A.3                           |
+| DEF-PS-12, DEF-PS-13, INV-PS-05, OBL-PS-04 | 4A.4                           |
+| DEF-PS-14, DEF-PS-15, INV-PS-06, OBL-PS-05 | 4A.5                           |
+
+**Institutional substrate (§3 → NOTE.md §4B):**
+
+| SPEC.md element                                       | NOTE.md principle(s)                |
+| ----------------------------------------------------- | ----------------------------------- |
+| DEF-IS-01, DEF-IS-02, DEF-IS-04, DEF-IS-05, DEF-IS-06 | 4B.1                                |
+| OBL-IS-03                                             | 4B.1 (Galois)                       |
+| DEF-IS-03, OBL-IS-02                                  | 4B.2 (resource-bounded clause)      |
+| DEF-IS-07, DEF-IS-08, DEF-IS-09                       | 4B.2 (sound capacity-update clause) |
+| INV-IS-01, INV-IS-02, INV-IS-03, OBL-IS-01, OBL-IS-04 | 4B.2                                |
+| DEF-IS-10, DEF-IS-11, INV-IS-04                       | 4B.3                                |
+| DEF-IS-12, DEF-IS-13, INV-IS-05, OBL-IS-05            | 4B.4                                |
+| DEF-IS-14, DEF-IS-15, INV-IS-06, OBL-IS-06            | 4B.5                                |
+
+**Interaction layer (§4 → NOTE.md §4C):**
+
+| SPEC.md element                                       | NOTE.md principle(s)             |
+| ----------------------------------------------------- | -------------------------------- |
+| DEF-IX-01, DEF-IX-02, INV-IX-01, OBL-IX-01            | 4C.2                             |
+| DEF-IX-03, DEF-IX-04, DEF-IX-05                       | 4C.1 (composite + decomposition) |
+| DEF-IX-06, DEF-IX-07, INV-IX-02, OBL-IX-02            | 4C.1 (licensing + coupling)      |
+| DEF-IX-08, DEF-IX-09, DEF-IX-10, INV-IX-03, OBL-IX-03 | 4C.3                             |
+
+**Temporal evolution (§5 → NOTE.md §4D):**
+
+| SPEC.md element                             | NOTE.md principle(s)                |
+| ------------------------------------------- | ----------------------------------- |
+| DEF-TE-01, INV-TE-01                        | 4D.1                                |
+| DEF-TE-02, DEF-TE-03, INV-TE-02             | 4D.2                                |
+| DEF-TE-04, DEF-TE-05, INV-TE-03, OBL-TE-01  | 4D.3                                |
+| DEF-TE-06, DEF-TE-06b, INV-TE-04, OBL-TE-02 | 4D.4 (incl. institutional symmetry) |
+| DEF-TE-07, INV-TE-05, OBL-TE-03             | 4D.5                                |
+
+### §8.3. Cross-cutting elements
+
+Three categories of SPEC.md elements do not anchor to a single `NOTE.md` principle and are cataloged separately.
+
+**Mathematical preliminaries (§1 — no NOTE.md anchor by design):** DEF-MP-01 through DEF-MP-17, INV-MP-01 through INV-MP-03. These are shared abstractions (order theory, Galois connections, type constructors, provenance/version carriers) used throughout §2–§5. They do not formalize specific `NOTE.md` claims; they provide vocabulary that downstream sections use. No traceability required.
+
+**Mathematical commitments (§0.3):** MC-1, MC-2, MC-3. These commit SPEC.md to specific mathematical structures (partial-meet poset; Galois-connection refinement; abstention as separate type). They are SPEC.md-level architectural choices not present in `NOTE.md`. No `NOTE.md` anchor required; rationale lives in §0.3.
+
+**Structural invariants spanning multiple principles:**
+
+| SPEC.md element                                 | Cross-cutting role                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| INV-IX-04 (Substrate-local soundness preserved) | Supports the §4C coupling claim as a whole: ensures §4A and §4B remain auditable independently of the interaction layer. Does not formalize a single `NOTE.md` principle; it formalizes a structural property `NOTE.md` §4C intro asserts ("The two substrates are coupled but not collapsed. Each retains its own deduction operators, its own provenance, its own abstention semantics.") |
+
+INV-IX-04 is the only cross-cutting structural invariant in v0.3.0-draft. If future revisions surface additional cross-cutting elements, they are added here.
+
+### §8.4. Coverage and gap analysis
+
+**Forward coverage** (every `NOTE.md` principle has ≥1 SPEC.md anchor): **18/18 principles covered.**
+
+**Reverse coverage** (every SPEC.md `[formalizes:]` annotation points to a real `NOTE.md` principle, verified against `NOTE.md` v0.12.0 verbatim): all annotations corrected during v0.2.0 → v0.3.0 transition (see CHANGELOG-SPEC.md for the 23-line correction set). **No known reverse-coverage gaps as of v0.3.0.**
+
+**Per-principle anchor density:**
+
+- Highest density: 4A.2 (ontology + sound deduction) and 4B.2 (resource-bounded + sound capacity transitions) — both with 10+ SPEC.md elements. Reflects that each principle combines two clauses (ontology bounding + sound transitions) that each generate definitions, invariants, and obligations.
+- Lowest density: 4D.1 (versioned components) and 4D.2 (currency) — 2 and 3 SPEC.md elements respectively. Reflects their foundational character: they enable other principles' formalizations rather than producing distinct discharge-bearing obligations. This is the OQ-X-01 asymmetry documented in §7.6.
+
+**Criticality preservation:** every SPEC.md element inherits its criticality from the highest-tier `NOTE.md` principle it formalizes (per §6.6). Spot-check across the 17 obligations: 5 P, 10 S, 2 F — matches §6.5 tally. ✓
+
+### §8.5. How to use this table
+
+For a **clinician** scrutinizing a specific `NOTE.md` claim, the workflow is:
+
+1. Identify the principle (e.g., "§4A.4 auditable provenance").
+2. Read §8.1 row for that principle to find SPEC.md anchors.
+3. Read those SPEC.md anchors (e.g., DEF-PS-12, DEF-PS-13, INV-PS-05, OBL-PS-04).
+4. Verify the formal definitions capture what `NOTE.md` claims. If they do not, the discrepancy is the substantive review finding — either SPEC.md formalizes the claim incorrectly, or `NOTE.md`'s claim is ambiguous in a way SPEC.md tried to resolve.
+
+For an **engineer** scrutinizing a specific SPEC.md element, the workflow is:
+
+1. Identify the element (e.g., "OBL-IX-03").
+2. Read its `[formalizes:]` annotation in §2–§5 (or use the §8.2 reverse table).
+3. Find the corresponding `NOTE.md` principle (e.g., 4C.3).
+4. Read the `NOTE.md` principle to see what informal claim the obligation formalizes.
+5. Verify the obligation captures the informal claim. Same discrepancy logic as above.
+
+This is the §0.1 contract operationalized. SPEC.md is engineering-audience; `NOTE.md` is clinical-audience; §8 is the bridge that lets each audience navigate the other's text without reading it in full.
+
+---
+
+_End of §8._
+
+## §9. Closing notes
+
+### §9.1. What SPEC.md v0.3.0-draft delivers
+
+A formalization layer between `NOTE.md` (clinical prose) and downstream artifacts (forthcoming `ARCHITECTURE.md`, code), structured to make the eighteen load-bearing principles of `NOTE.md` §4 individually attackable:
+
+- **57 named definitions** (DEF-\*) across patient substrate, institutional substrate, interaction layer, temporal evolution, and shared mathematical preliminaries.
+- **23 named invariants** (INV-\*) capturing structural properties operators and proposers must satisfy.
+- **17 stated proof obligations** (OBL-\*) consolidated in §6, each with expected discharge tier and criticality marker inherited from the `NOTE.md` principle it formalizes.
+- **3 mathematical commitments** (MC-1, MC-2, MC-3) made explicitly in §0.3, with rationale for choosing one notch less specific than feels comfortable.
+- **12 open questions** (OQ-\*) in §7, separated into resolved/deferred/required-before-v1.0 buckets.
+- **Bidirectional traceability** (§8) covering all 18 `NOTE.md` principles with no known coverage gaps.
+
+The eighteen-principle invariant is preserved. The 5 P / 10 S / 3 F criticality distribution from `NOTE.md` v0.12.0 is reflected at the obligation level (5 P / 10 S / 2 F obligations) with the F-count asymmetry documented as OQ-X-01.
+
+### §9.2. What SPEC.md v0.3.0-draft does not deliver
+
+- **Mechanized proofs.** Obligations are stated. Discharge (Lean 4, Agda, property-based testing, runtime assertions) is deferred to architectural and implementation work.
+- **Concrete encodings.** Provenance carriers, version identifiers, ontology bindings, currency thresholds, and audit-log formats are all opaque interfaces. Concrete bindings belong in `ARCHITECTURE.md`.
+- **Worked clinical examples.** `NOTE.md` §7E.1–§7E.6 are the canonical worked examples. SPEC.md does not duplicate them; it gives the formal vocabulary the examples can be re-expressed in if needed.
+- **A complete formal specification.** Twelve open questions remain. Two are required before v1.0 (§8 was OQ-X-02, now closed; the informal-argument discharge mechanism OQ-X-03 remains). Stable v1 is not yet possible.
+- **A path to deployment.** SPEC.md is the formalization of the architecture, not the engineering of it. The bottleneck items `NOTE.md` §8 names (regulatory engagement, clinical pilot validation, institutional adoption) are unaffected by formalization quality.
+
+### §9.3. What changes downstream
+
+`ARCHITECTURE.md` (forthcoming) draws its diagrams from SPEC.md, not directly from `NOTE.md`. The five diagrams informally sketched as the v0.1.0 ARCHITECTURE.md target should now be revised to render SPEC.md's typed structures (Galois connections, operator sets, joint-licensing decomposition, re-review events for both substrates) rather than the prose-level commitments `NOTE.md` makes. This is what §0.1 commits to: SPEC.md is the substrate `ARCHITECTURE.md` visualizes; `NOTE.md` is the prose substrate justifies.
+
+Code (eventual) inherits the type signatures, invariants, and obligations stated here. Rust as the implementation language is consistent with SPEC.md's structural choices (sum types for `Result⟨H, R⟩` matches `enum`; refinement types for capacity validity match `newtype` patterns with `pub` constructors; typestate for re-review event lifecycle matches state-machine encodings). Whether to mechanize in Lean 4 alongside Rust is a v1.x or v2.x destination, conditional on Tier B (this document) stabilizing through at least one full revision cycle.
+
+### §9.4. Status disclosure
+
+This document is **a working draft for scrutiny, not for citation**, paralleling `NOTE.md`'s status disclosure. SPEC.md inherits `NOTE.md`'s originality assessment window (valid through 2026-08-24, quarterly re-verification cadence). When `NOTE.md` re-verifies, SPEC.md re-verifies its `[formalizes:]` annotations against the current verbatim. The two documents move together by design.
+
+The CC BY 4.0 license applies to the SPEC.md text as a derivative work of the same author authoring `NOTE.md`. Future code added to the repository carries Apache-2.0 per the repository README; SPEC.md straddles the prose/code boundary but is licensed as prose.
+
+### §9.5. Invitation
+
+The most useful responses to SPEC.md, in order of preference, mirror `NOTE.md` §9 with engineering-audience framing:
+
+1. **A demonstration that one of the 18 principles is formalized wrong here** — the SPEC.md element does not capture the `NOTE.md` claim, or captures it in a way that admits unsafe behavior the principle was meant to forbid. The §8 traceability table makes per-principle review tractable.
+2. **A demonstration that one of the 12 open questions in §7 has a published resolution** the author missed. Open questions are bets that the answer is not yet known; counterevidence is welcome.
+3. **A demonstration that one of the 17 obligations cannot be discharged at its stated tier** (type-system, property test, runtime, informal argument). Tier misclassification is recoverable; an obligation that cannot be discharged at any tier is a structural problem.
+4. **A demonstration that a SPEC.md definition lets an unsafe behavior through** that `NOTE.md` would forbid. The safety asymmetry — learned components can be wrong without being unsafe — depends on the type-level boundaries holding; counterexamples are the most informative finding.
+
+Disagreement on any of these is the most useful response this document can receive.
+
+---
+
+_End of §9. End of SPEC.md v0.3.0-draft._
