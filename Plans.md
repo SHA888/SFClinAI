@@ -49,11 +49,11 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 3.1 | Unit tests for `Hyp` type | Tests for PartialOrd properties, compat predicate, meet behavior; all passing | 1.6 [tdd:required] | cc:TODO |
-| 3.2 | Unit tests for `SofaRespOperator` | Three cases: (a) accepting (ratio 350 → `Refined(Score1)`), (b) abstaining on insufficient evidence (fio2=0 → `Abstain(InsufficientEvidence)`), (c) refusing on precondition (ratio 80 without vent → `Abstain(OperatorPreconditionUnmet)`); property test: operator output always refines input; all passing | 2.4 [tdd:required] | cc:TODO |
-| 3.3 | Write `clinlat/README.md` | End-to-end example: construct `Evidence`, apply `SofaRespOperator`, inspect `Outcome`; cross-refs to NOTE.md §4A and SPEC.md §2; rustdoc links | 2.5 | cc:TODO |
-| 3.4 | Crate-level and module-level rustdoc | Rustdoc for `clinlat`, `clinlat::hyp`, `clinlat::operator`, `clinlat::sofa` modules; all public items documented | 3.3 | cc:TODO |
-| 3.5 | Verify `cargo doc --no-deps` renders without warnings | `cargo doc --no-deps` succeeds, no warnings or errors | 3.4 | cc:TODO |
+| 3.1 | Unit tests for `Hyp` type | Tests for PartialOrd properties, compat predicate, meet behavior; all passing | 1.6 [tdd:required] | cc:完了 [ef33d67] |
+| 3.2 | Unit tests for `SofaRespOperator` | Three cases: (a) accepting (ratio 350 → `Refined(Score1)`), (b) abstaining on insufficient evidence (fio2=0 → `Abstain(InsufficientEvidence)`), (c) refusing on precondition (ratio 80 without vent → `Abstain(OperatorPreconditionUnmet)`); property test: operator output always refines input; all passing | 2.4 [tdd:required] | cc:完了 [ef33d67] |
+| 3.3 | Write `clinlat/README.md` | End-to-end example: construct `Evidence`, apply `SofaRespOperator`, inspect `Outcome`; cross-refs to NOTE.md §4A and SPEC.md §2; rustdoc links | 2.5 | cc:完了 [ef33d67] |
+| 3.4 | Crate-level and module-level rustdoc | Rustdoc for `clinlat`, `clinlat::hyp`, `clinlat::operator`, `clinlat::sofa` modules; all public items documented | 3.3 | cc:完了 [ef33d67] |
+| 3.5 | Verify `cargo doc --no-deps` renders without warnings | `cargo doc --no-deps` succeeds, no warnings or errors | 3.4 | cc:完了 [ef33d67] |
 
 ---
 
