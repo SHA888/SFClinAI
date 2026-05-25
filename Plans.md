@@ -28,7 +28,7 @@
 | 1.2 | Implement `SnomedAdapter` — thin client for SNOMED CT API/snapshot (per M1.1 scope) | Adapter impl with ≥3 example codes; `cargo test` passes; doc refs SNOMED CT Edition reference | 1.1 [tdd:required] | cc:todo |
 | 1.3 | Implement `RxNormAdapter` — thin client for RxNorm (drugs, strengths) | Adapter impl with ≥3 example drug codes; `cargo test` passes | 1.1 [tdd:required] | cc:done [8e085f0] |
 | 1.4 | Implement `LoincAdapter` — thin client for LOINC (lab tests, vital signs) | Adapter impl with ≥3 example LOINC codes; `cargo test` passes | 1.1 [tdd:required] | cc:done [dad0fb0] |
-| 1.5 | Implement `Icd11Adapter` — thin client for ICD-11 (diagnoses, procedure codes) | Adapter impl with ≥3 example ICD-11 codes; `cargo test` passes | 1.1 [tdd:required] | cc:todo |
+| 1.5 | Implement `Icd11Adapter` — thin client for ICD-11 (diagnoses, procedure codes) | Adapter impl with ≥3 example ICD-11 codes; `cargo test` passes | 1.1 [tdd:required] | cc:done [68f6fc3] |
 | 1.6 | Define `Atom` type as replacement for `&'static str` AtomId | `pub struct Atom { system: OntologySystem, code: String, preferred_term: String }` with PartialEq, Hash, Clone; doc names DEF-PS-03 | 1.1 | cc:todo |
 | 1.7 | Update `Hyp` struct to use `Atom` instead of `&'static str`; preserve refinement order semantics | `Hyp` variants now carry `Atom` payloads; PartialOrd / compatibility / meet logic unchanged; all existing tests pass | 1.2, 1.3, 1.4, 1.5, 1.6 [tdd:required] | cc:todo |
 | 1.8 | Write INV-PS-01 proof (ontology closure) — show that all atoms in a Hyp are reachable from resolving the registered OntologyAdapter set | Informal-argument doc `clinlat/docs/invariants/inv-ps-01-closure.md`; cite adapters as correctness premises | 1.7 | cc:todo |
