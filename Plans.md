@@ -24,12 +24,12 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 1.1 | Define `Hyp` struct with PartialOrd, compat, meet | `Hyp` implements refinement order per DEF-PS-01, compatibility per DEF-PS-01, meet per INV-PS-02; doc comment names v0.1.0 simplification (AtomId is `&'static str`) | 0.7 | cc:TODO |
-| 1.2 | Define `AtomId` placeholder type | `pub type AtomId = &'static str` with doc naming ontology-binding deferral | 1.1 | cc:TODO |
-| 1.3 | Implement `Outcome<H, A>` operator result type | `Outcome` enum with `Refined(H)` and `Abstain(A)` variants; `map` and `and_then` methods; reasoning: avoids Rust `Result` collision; aligns with SPEC.md OQ-MP-02 | 0.7 | cc:TODO |
-| 1.4 | Define `AbstainReason` enum with five variants | `AbstainReason` carries five variants from DEF-PS-10 (`InsufficientEvidence`, `OutOfDistribution`, `AmbiguousRefinement`, `OperatorPreconditionUnmet`, `OntologyOutOfScope`), each with `&'static str` payload | 1.3 | cc:TODO |
-| 1.5 | Define `Evidence` stub type | `Evidence` struct typed observation packet; provenance carrier is `()` stub (real provenance deferred to v0.2) | 1.4 | cc:TODO |
-| 1.6 | Define `Operator` trait signature | `pub trait Operator { fn apply(&self, h: &Hyp, e: &Evidence) -> Outcome<Hyp, AbstainReason>; }` matching DEF-PS-07 | 1.5 | cc:TODO |
+| 1.1 | Define `Hyp` struct with PartialOrd, compat, meet | `Hyp` implements refinement order per DEF-PS-01, compatibility per DEF-PS-01, meet per INV-PS-02; doc comment names v0.1.0 simplification (AtomId is `&'static str`) | 0.7 | cc:完了 [dc103e3] |
+| 1.2 | Define `AtomId` placeholder type | `pub type AtomId = &'static str` with doc naming ontology-binding deferral | 1.1 | cc:完了 [dc103e3] |
+| 1.3 | Implement `Outcome<H, A>` operator result type | `Outcome` enum with `Refined(H)` and `Abstain(A)` variants; `map` and `and_then` methods; reasoning: avoids Rust `Result` collision; aligns with SPEC.md OQ-MP-02 | 0.7 | cc:完了 [dc103e3] |
+| 1.4 | Define `AbstainReason` enum with five variants | `AbstainReason` carries five variants from DEF-PS-10 (`InsufficientEvidence`, `OutOfDistribution`, `AmbiguousRefinement`, `OperatorPreconditionUnmet`, `OntologyOutOfScope`), each with `&'static str` payload | 1.3 | cc:完了 [dc103e3] |
+| 1.5 | Define `Evidence` stub type | `Evidence` struct typed observation packet; provenance carrier is `()` stub (real provenance deferred to v0.2) | 1.4 | cc:完了 [dc103e3] |
+| 1.6 | Define `Operator` trait signature | `pub trait Operator { fn apply(&self, h: &Hyp, e: &Evidence) -> Outcome<Hyp, AbstainReason>; }` matching DEF-PS-07 | 1.5 | cc:完了 [dc103e3] |
 
 ---
 
