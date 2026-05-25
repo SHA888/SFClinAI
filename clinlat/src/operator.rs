@@ -2,7 +2,7 @@
 //!
 //! Implements DEF-PS-07 (Operator trait interface).
 
-use crate::{Hyp, Outcome, AbstainReason};
+use crate::{AbstainReason, Hyp, Outcome};
 
 /// Evidence: a typed observation packet for operator input.
 ///

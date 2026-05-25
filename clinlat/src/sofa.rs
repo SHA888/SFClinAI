@@ -5,15 +5,15 @@
 //!
 //! Reference: Vincent et al. (1996) on SOFA scoring; Singer et al. (2016) on Sepsis-3.
 
-use crate::{Hyp, Outcome, AbstainReason, Operator};
+use crate::{AbstainReason, Hyp, Operator, Outcome};
 
 // SOFA respiratory score thresholds (PaO₂/FiO₂ ratio in mmHg).
 //
 // Implements task 2.1: Encode SOFA respiratory thresholds per Sepsis-3.
-const SOFA_SCORE_0_MIN: f64 = 400.0;      // ≥400: score 0 (no respiratory dysfunction)
-const SOFA_SCORE_1_MIN: f64 = 300.0;      // 300–399: score 1
-const SOFA_SCORE_2_MIN: f64 = 200.0;      // 200–299: score 2
-const SOFA_SCORE_3_MIN: f64 = 100.0;      // 100–199: score 3 (requires mechanical ventilation)
+const SOFA_SCORE_0_MIN: f64 = 400.0; // ≥400: score 0 (no respiratory dysfunction)
+const SOFA_SCORE_1_MIN: f64 = 300.0; // 300–399: score 1
+const SOFA_SCORE_2_MIN: f64 = 200.0; // 200–299: score 2
+const SOFA_SCORE_3_MIN: f64 = 100.0; // 100–199: score 3 (requires mechanical ventilation)
 // <100: score 4 (requires mechanical ventilation)
 
 /// Evidence for SOFA respiratory scoring.
@@ -46,7 +46,7 @@ impl SofaRespEvidence {
     /// Computes the PaO₂/FiO₂ ratio.
     ///
     /// Returns `None` if FiO₂ is zero or negative (invalid).
-    fn pao2_fio2_ratio(&self) -> Option<f64> {
+    pub fn pao2_fio2_ratio(&self) -> Option<f64> {
         if self.fio2 > 0.0 {
             Some(self.pao2 / self.fio2)
         } else {
@@ -101,7 +101,7 @@ impl SofaRespHypothesis {
 pub struct SofaRespOperator;
 
 impl Operator for SofaRespOperator {
-    fn apply(&self, _h: &Hyp, e: &crate::operator::Evidence) -> Outcome<Hyp, AbstainReason> {
+    fn apply(&self, _h: &Hyp, _e: &crate::operator::Evidence) -> Outcome<Hyp, AbstainReason> {
         // In v0.1.0, we work with a unit Evidence type. Real evidence will be passed in v0.2.
         // For now, return an abstention indicating we need proper evidence structure.
         Outcome::Abstain(AbstainReason::InsufficientEvidence(

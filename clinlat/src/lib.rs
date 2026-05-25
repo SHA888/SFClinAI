@@ -70,14 +70,14 @@
 //! - **Formalization**: SPEC.md § 2 (patient-state substrate).
 //! - **SOFA-3**: Vincent et al. (1996), Singer et al. (2016, Sepsis-3).
 
-pub mod hyp;
-pub mod outcome;
 pub mod abstain;
+pub mod hyp;
 pub mod operator;
+pub mod outcome;
 pub mod sofa;
 
-pub use hyp::{Hyp, AtomId};
-pub use outcome::Outcome;
 pub use abstain::AbstainReason;
+pub use hyp::{AtomId, Hyp};
 pub use operator::Operator;
-pub use sofa::{SofaRespOperator, SofaRespEvidence, SofaRespHypothesis};
+pub use outcome::Outcome;
+pub use sofa::{SofaRespEvidence, SofaRespHypothesis, SofaRespOperator};
