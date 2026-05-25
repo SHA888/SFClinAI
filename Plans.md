@@ -12,9 +12,9 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 0.1 | **D1 Decision: Provenance encoding** — decide CBOR vs. JSON vs. Merkle DAG vs. hybrid for `Provenance` carrier type. Criteria: serialization overhead, query-ability, audit trail fidelity per OBL-PS-04. Document trade-offs in `DESIGN-D1-provenance.md` | Decision document with rationale and implementation sketch; consensus in team/advisor review if applicable | - | cc:TODO |
-| 0.2 | **D2 Decision: Ontology adapter caching strategy** — decide in-memory cache vs. Redis vs. offline snapshot vs. hybrid for SNOMED CT, RxNorm, LOINC, ICD-11 access. Constraints per M1.1: DEF-PS-03/04, INV-PS-01. Document in `DESIGN-D2-ontology.md` | Decision document with caching topology sketch, API contract for OntologyAdapter trait | 0.1 | cc:TODO |
-| 0.3 | Write **spec SSOT for M1 provenance contract** (`docs/spec/M1-provenance-spec.md`) — formalizes the Provenance type signature, serialization, deserialization, query interface; anchors to DEF-MP-14, DEF-PS-12, DEF-PS-13, INV-PS-05, OBL-PS-04 | Spec document with type signatures, invariant proofs, example encoded/decoded Provenance values | 0.1 | cc:TODO |
+| 0.1 | **D1 Decision: Provenance encoding** — decide CBOR vs. JSON vs. Merkle DAG vs. hybrid for `Provenance` carrier type. Criteria: serialization overhead, query-ability, audit trail fidelity per OBL-PS-04. Document trade-offs in `DESIGN-D1-provenance.md` | Decision document with rationale and implementation sketch; consensus in team/advisor review if applicable | - | cc:完了 [7fa0c69] |
+| 0.2 | **D2 Decision: Ontology adapter caching strategy** — decide in-memory cache vs. Redis vs. offline snapshot vs. hybrid for SNOMED CT, RxNorm, LOINC, ICD-11 access. Constraints per M1.1: DEF-PS-03/04, INV-PS-01. Document in `DESIGN-D2-ontology.md` | Decision document with caching topology sketch, API contract for OntologyAdapter trait | 0.1 | cc:完了 [a621f2f] |
+| 0.3 | Write **spec SSOT for M1 provenance contract** (`docs/spec/M1-provenance-spec.md`) — formalizes the Provenance type signature, serialization, deserialization, query interface; anchors to DEF-MP-14, DEF-PS-12, DEF-PS-13, INV-PS-05, OBL-PS-04 | Spec document with type signatures, invariant proofs, example encoded/decoded Provenance values | 0.1 | cc:完了 [139ecfa] |
 
 ---
 
