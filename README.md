@@ -8,7 +8,7 @@ This repository holds the prose of that position. Code does not yet exist.
 
 ## What it is
 
-A working draft (`NOTE.md`, v0.10.1-draft) and accompanying Mermaid diagrams (`ARCHITECTURE.md`, v0.1.0) staking out a falsifiable diagnostic claim: **clinical AI is bottlenecked less by model size than by the absence of explicit, auditable, reversible belief-state architectures that can update medical hypotheses under hard safety constraints** (NOTE.md §3).
+A working draft (`NOTE.md`, v0.10.1-draft), formalization layer (`SPEC.md`, v0.1.0-draft), and accompanying Mermaid diagrams (`ARCHITECTURE.md`, v0.1.0-draft) staking out a falsifiable diagnostic claim: **clinical AI is bottlenecked less by model size than by the absence of explicit, auditable, reversible belief-state architectures that can update medical hypotheses under hard safety constraints** (NOTE.md §3).
 
 The architecture rests on eighteen load-bearing principles — five for the patient-state substrate (§4A), five for the institutional-state substrate (§4B), three for the interaction semantics between them (§4C), and five for temporal evolution and substrate currency (§4D). Each is stated separately so it can be attacked separately.
 
@@ -31,7 +31,8 @@ Short on time: stopping after step 3 still holds the load-bearing claim.
 ```
 SFClinAI/
 ├── NOTE.md             # Position note, v0.10.1-draft
-├── ARCHITECTURE.md     # Five Mermaid diagrams, v0.1.0
+├── SPEC.md             # Formalization (Tier B), v0.1.0-draft
+├── ARCHITECTURE.md     # Five Mermaid diagrams, v0.1.0-draft
 ├── CHANGELOG-NOTE.md   # Version history of the note
 ├── README.md           # This file
 └── LICENSE             # CC BY 4.0 (verbatim legal code)
@@ -55,7 +56,8 @@ The composite is positioned as a route from UNDCS-class to CCS-class under the T
 ## Status and maturity
 
 - `NOTE.md`: **v0.10.1-draft**. Working draft for scrutiny. Not for citation.
-- `ARCHITECTURE.md`: **v0.1.0**. Initial diagrams; expected to co-evolve with the note.
+- `SPEC.md`: **v0.1.0-draft**. Formalization layer (Tier B: typed signatures, named invariants, proof obligations). §0 complete; §1–§5 pending; §6–§8 will be constructed incrementally.
+- `ARCHITECTURE.md`: **v0.1.0-draft**. Five Mermaid diagrams; expected to co-evolve with the note.
 - No code. No deployed system. No regulatory engagement.
 - Originality assessment timestamped 2026-05-24, valid through **2026-08-24** (quarterly re-verification cadence, per NOTE.md header and §6 closing).
 
@@ -79,7 +81,7 @@ Issues for short critiques; PRs to `critique/` for long-form.
 
 ## License
 
-- **Prose and diagrams** (`NOTE.md`, `ARCHITECTURE.md`, `CHANGELOG-NOTE.md`, `README.md`) are licensed under **Creative Commons Attribution 4.0 International (CC BY 4.0)**. See `LICENSE` for the verbatim legal code.
+- **Prose, diagrams, and formalization** (`NOTE.md`, `ARCHITECTURE.md`, `SPEC.md`, `CHANGELOG-NOTE.md`, `README.md`) are licensed under **Creative Commons Attribution 4.0 International (CC BY 4.0)**. See `LICENSE` for the verbatim legal code.
 - **Future code** added to this repository will be licensed under **Apache License 2.0**. A separate license file and per-file SPDX headers will be added when the first code lands; no Apache-2.0 file is included now because no code exists yet.
 
 Attribution: **Kresna Sucandra, MD**.
