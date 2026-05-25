@@ -108,7 +108,7 @@ SPEC.md follows SemVer applied to its public definitions and invariants. The rul
 - **MINOR** bump: additive changes — new definitions, new invariants, new proof obligations, new substrates. Existing identifiers retain their meaning.
 - **PATCH** bump: clarifications, typo fixes, rephrasings that preserve meaning, additions of cross-references or rationale text.
 
-Each version is accompanied by an entry in a forthcoming `CHANGELOG-SPEC.md` (to be created when SPEC.md leaves draft status).
+Each version is recorded in the header at the top of this file; the diff history lives in the repository's git log.
 
 While `v0.x.y`, all bumps are permitted to be more aggressive than strict SemVer requires; the discipline above applies fully from `v1.0.0` onward. The current `-draft` suffix indicates that even MINOR-numbered identifiers may move before the document stabilizes.
 
@@ -1259,7 +1259,7 @@ INV-IX-04 is the only cross-cutting structural invariant in v0.3.0-draft. If fut
 
 **Forward coverage** (every `NOTE.md` principle has ≥1 SPEC.md anchor): **18/18 principles covered.**
 
-**Reverse coverage** (every SPEC.md `[formalizes:]` annotation points to a real `NOTE.md` principle, verified against `NOTE.md` v0.12.0 verbatim): all annotations corrected during v0.2.0 → v0.3.0 transition (see CHANGELOG-SPEC.md for the 23-line correction set). **No known reverse-coverage gaps as of v0.3.0.**
+**Reverse coverage** (every SPEC.md `[formalizes:]` annotation points to a real `NOTE.md` principle, verified against `NOTE.md` v0.12.0 verbatim): all annotations corrected during the v0.2.0 → v0.3.0 transition (the 23-line correction set is visible in git history). **No known reverse-coverage gaps as of v0.3.0.**
 
 **Per-principle anchor density:**
 
