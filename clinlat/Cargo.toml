@@ -9,3 +9,4 @@ documentation = "https://docs.rs/clinlat"
 description = "A symbolic substrate for clinical decision-making based on refinable hypothesis lattices and sound deduction operators"
 
 [dependencies]
+async-trait = "0.1"
