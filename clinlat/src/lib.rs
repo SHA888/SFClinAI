@@ -20,8 +20,10 @@ pub mod hyp;
 pub mod outcome;
 pub mod abstain;
 pub mod operator;
+pub mod sofa;
 
 pub use hyp::{Hyp, AtomId};
 pub use outcome::Outcome;
 pub use abstain::AbstainReason;
 pub use operator::Operator;
+pub use sofa::{SofaRespOperator, SofaRespEvidence, SofaRespHypothesis};
