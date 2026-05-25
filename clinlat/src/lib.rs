@@ -20,9 +20,15 @@
 //! Hypotheses are ordered by **refinement**: `h1 ⊑ h2` (h1 refines h2) means h1 is more specific.
 //!
 //! ```
-//! # use clinlat::Hyp;
+//! # use clinlat::{Hyp, Atom, OntologySystem};
 //! let unknown = Hyp::unknown();  // Top element: no information.
-//! let specific = Hyp::new(vec!["sofa_score_3"]);  // More specific.
+//! let atom = Atom {
+//!     system: OntologySystem::SNOMED,
+//!     code: "67822003".to_string(),
+//!     preferred_term: "Hypoxemia".to_string(),
+//!     version: "2026-01-31".to_string(),
+//! };
+//! let specific = Hyp::new(vec![atom]);  // More specific.
 //! assert!(specific < unknown);  // Refinement ordering.
 //! ```
 //!
