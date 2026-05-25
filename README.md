@@ -78,7 +78,7 @@ Issues for short critiques; PRs to `critique/` for long-form.
 
 ## License
 
-- **Prose and diagrams** (`NOTE.md`, `ARCHITECTURE.md`, `SPEC.md`, `README.md`) are licensed under **Creative Commons Attribution 4.0 International (CC BY 4.0)**. See `LICENSE` for the verbatim legal code.
-- **Future code** added to this repository will be licensed under **Apache License 2.0**. A separate license file and per-file SPDX headers will be added when the first code lands; no Apache-2.0 file is included now because no code exists yet.
+- **Prose and diagrams** (`NOTE.md`, `ARCHITECTURE.md`, `SPEC.md`, `README.md`) are licensed under **Creative Commons Attribution 4.0 International (CC BY 4.0)**. See `LICENSE` for the preamble and full legal code.
+- **Code** (including the `clinlat/` crate and any future code) is licensed under **MIT OR Apache-2.0**. See `LICENSE-MIT` and `LICENSE-APACHE` for the full text of each license.
 
 Attribution: **Kresna Sucandra, MD**.
