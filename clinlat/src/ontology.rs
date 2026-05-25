@@ -388,6 +388,125 @@ impl OntologyAdapter for SNOMEDAdapter {
     }
 }
 
+/// RxNorm drug ontology adapter with in-memory LRU cache and offline snapshot fallback.
+///
+/// Per [DESIGN-D2][1] and [SPEC.md DEF-PS-03][2]:
+/// RxNormAdapter resolves RxNorm drug codes to atoms using an in-memory LRU cache backed by
+/// an offline snapshot. RxNorm codes (RXCUIs) identify drugs with specific strengths and forms
+/// (e.g., "855288" for Lisinopril 10 mg tablet). In M1, snapshots are hand-coded test data.
+/// Real RxNorm API integration (if needed) defers to M5+.
+///
+/// [1]: https://github.com/SHA888/SFClinAI/blob/main/DESIGN-D2-ontology.md
+/// [2]: https://github.com/SHA888/SFClinAI/blob/main/SPEC.md#def-ps-03
+pub struct RxNormAdapter {
+    /// In-memory LRU cache for frequently accessed drug codes.
+    cache: std::sync::Arc<tokio::sync::Mutex<lru::LruCache<String, Atom>>>,
+    /// Offline snapshot: pre-loaded RxNorm drug codes.
+    snapshot: std::sync::Arc<std::collections::HashMap<String, Atom>>,
+    /// RxNorm release version (e.g., "2026-01-06").
+    version: String,
+    /// Caching mode for this adapter.
+    mode: CacheMode,
+}
+
+impl RxNormAdapter {
+    /// Create a new RxNormAdapter.
+    ///
+    /// # Arguments
+    /// * `snapshot` - Pre-loaded RxNorm codes as a HashMap.
+    /// * `cache_size` - LRU cache capacity (e.g., 10000 for typical pilot).
+    /// * `version` - RxNorm release version (e.g., "2026-01-06").
+    /// * `mode` - Caching mode (CacheOnly for M1 with in-memory snapshots).
+    pub fn new(
+        snapshot: std::collections::HashMap<String, Atom>,
+        cache_size: usize,
+        version: impl Into<String>,
+        mode: CacheMode,
+    ) -> Self {
+        RxNormAdapter {
+            cache: std::sync::Arc::new(tokio::sync::Mutex::new(lru::LruCache::new(
+                std::num::NonZeroUsize::new(cache_size).unwrap(),
+            ))),
+            snapshot: std::sync::Arc::new(snapshot),
+            version: version.into(),
+            mode,
+        }
+    }
+
+    /// Create a test adapter with standard RxNorm examples.
+    ///
+    /// This is a convenience constructor for testing. Loads three standard RxNorm codes
+    /// representing drugs commonly used in critical care (supporting clinical decision operators).
+    #[cfg(test)]
+    pub fn test_adapter() -> Self {
+        let mut snapshot = std::collections::HashMap::new();
+        snapshot.insert(
+            "855288".to_string(),
+            Atom {
+                system: OntologySystem::RxNorm,
+                code: "855288".to_string(),
+                preferred_term: "Lisinopril 10 MG Oral Tablet".to_string(),
+                version: "2026-01-06".to_string(),
+            },
+        );
+        snapshot.insert(
+            "312547".to_string(),
+            Atom {
+                system: OntologySystem::RxNorm,
+                code: "312547".to_string(),
+                preferred_term: "Metformin 500 MG Oral Tablet".to_string(),
+                version: "2026-01-06".to_string(),
+            },
+        );
+        snapshot.insert(
+            "1049612".to_string(),
+            Atom {
+                system: OntologySystem::RxNorm,
+                code: "1049612".to_string(),
+                preferred_term: "Levothyroxine 50 MCG Oral Tablet".to_string(),
+                version: "2026-01-06".to_string(),
+            },
+        );
+
+        RxNormAdapter::new(snapshot, 100, "2026-01-06", CacheMode::CacheOnly)
+    }
+}
+
+#[async_trait::async_trait]
+impl OntologyAdapter for RxNormAdapter {
+    async fn resolve_atom(&self, code: &str) -> Result<Atom, OntologyError> {
+        // Check L1 cache first
+        {
+            let mut cache = self.cache.lock().await;
+            if let Some(atom) = cache.get(code) {
+                return Ok(atom.clone());
+            }
+        }
+
+        // Fallback to offline snapshot
+        if let Some(atom) = self.snapshot.get(code).cloned() {
+            // Update cache on hit
+            let mut cache = self.cache.lock().await;
+            cache.put(code.to_string(), atom.clone());
+            return Ok(atom);
+        }
+
+        // Not found
+        Err(OntologyError::CodeNotFound {
+            code: code.to_string(),
+            system: OntologySystem::RxNorm,
+        })
+    }
+
+    fn ontology_version(&self) -> &str {
+        &self.version
+    }
+
+    fn cache_mode(&self) -> CacheMode {
+        self.mode
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -589,6 +708,99 @@ mod tests {
             code: "67822003".to_string(),
             preferred_term: "Hypoxemia".to_string(),
             version: "2026-01-31".to_string(),
+        };
+        assert!(adapter.validate_compatibility(&atom1, &atom2));
+    }
+
+    // RxNormAdapter tests
+    #[tokio::test]
+    async fn test_rxnorm_adapter_resolve_success() {
+        let adapter = RxNormAdapter::test_adapter();
+        let atom = adapter.resolve_atom("855288").await;
+        assert!(atom.is_ok());
+        let atom = atom.unwrap();
+        assert_eq!(atom.code, "855288");
+        assert_eq!(atom.preferred_term, "Lisinopril 10 MG Oral Tablet");
+        assert_eq!(atom.system, OntologySystem::RxNorm);
+    }
+
+    #[tokio::test]
+    async fn test_rxnorm_adapter_resolve_not_found() {
+        let adapter = RxNormAdapter::test_adapter();
+        let result = adapter.resolve_atom("999999999").await;
+        assert!(result.is_err());
+        match result {
+            Err(OntologyError::CodeNotFound { code, system }) => {
+                assert_eq!(code, "999999999");
+                assert_eq!(system, OntologySystem::RxNorm);
+            }
+            _ => panic!("Expected CodeNotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rxnorm_adapter_cache_behavior() {
+        let adapter = RxNormAdapter::test_adapter();
+
+        // First call loads from snapshot
+        let atom1 = adapter.resolve_atom("855288").await.unwrap();
+
+        // Second call should come from cache
+        let atom2 = adapter.resolve_atom("855288").await.unwrap();
+
+        assert_eq!(atom1, atom2);
+        assert_eq!(atom1.code, "855288");
+    }
+
+    #[tokio::test]
+    async fn test_rxnorm_adapter_version() {
+        let adapter = RxNormAdapter::test_adapter();
+        assert_eq!(adapter.ontology_version(), "2026-01-06");
+    }
+
+    #[tokio::test]
+    async fn test_rxnorm_adapter_cache_mode() {
+        let adapter = RxNormAdapter::test_adapter();
+        assert_eq!(adapter.cache_mode(), CacheMode::CacheOnly);
+    }
+
+    #[tokio::test]
+    async fn test_rxnorm_adapter_multiple_codes() {
+        let adapter = RxNormAdapter::test_adapter();
+
+        // Test three different RxNorm codes from the fixture
+        let lisinopril = adapter.resolve_atom("855288").await.unwrap();
+        assert_eq!(lisinopril.preferred_term, "Lisinopril 10 MG Oral Tablet");
+
+        let metformin = adapter.resolve_atom("312547").await.unwrap();
+        assert_eq!(metformin.preferred_term, "Metformin 500 MG Oral Tablet");
+
+        let levothyroxine = adapter.resolve_atom("1049612").await.unwrap();
+        assert_eq!(
+            levothyroxine.preferred_term,
+            "Levothyroxine 50 MCG Oral Tablet"
+        );
+
+        // All should have the same version
+        assert_eq!(lisinopril.version, "2026-01-06");
+        assert_eq!(metformin.version, "2026-01-06");
+        assert_eq!(levothyroxine.version, "2026-01-06");
+    }
+
+    #[test]
+    fn test_rxnorm_adapter_compatibility() {
+        let adapter = RxNormAdapter::test_adapter();
+        let atom1 = Atom {
+            system: OntologySystem::RxNorm,
+            code: "855288".to_string(),
+            preferred_term: "Lisinopril 10 MG Oral Tablet".to_string(),
+            version: "2026-01-06".to_string(),
+        };
+        let atom2 = Atom {
+            system: OntologySystem::RxNorm,
+            code: "855288".to_string(),
+            preferred_term: "Lisinopril 10 MG Oral Tablet".to_string(),
+            version: "2026-01-06".to_string(),
         };
         assert!(adapter.validate_compatibility(&atom1, &atom2));
     }
