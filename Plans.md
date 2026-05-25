@@ -2,6 +2,7 @@
 
 **Project:** clinlat substrate kernel v0.1.0
 **Created:** 2026-05-25
+**Status:** ✓ Complete (2026-05-25)
 **Scope:** Rust implementation; out-of-scope items tracked in NOTE.md §7 and SPEC.md §7.
 
 ---
@@ -87,27 +88,15 @@ These belong to v0.2.0+ backlog:
 
 ---
 
-## Next steps
+## v0.1.0 completion summary
 
-**New session startup:**
+**28 tasks completed across 4 phases:**
+- Phase 0: 7 repo prerequisites (directory, Cargo.toml, licensing, CI setup, gitignore)
+- Phase 1: 6 core types (Hyp poset, AtomId, Outcome<H,A>, AbstainReason, Evidence, Operator trait)
+- Phase 2: 5 SOFA operator (thresholds, evidence type, hypothesis variants, implementation, soundness argument)
+- Phase 3: 5 tests and docs (Hyp tests, SofaRespOperator tests, README, rustdoc, doc verification)
+- Phase 4: 5 release prep (CI verification, publish dry-run, NOTE/SPEC updates, tagging, DOI decision deferred to v0.2)
 
-```
-claude
-```
+**Next milestone:** v0.2.0 (institutional substrate, interaction layer, additional operators)
 
-**After startup, use:**
-
-```
-/harness-work 0.1
-```
-
-**Suitable for:**
-Phase 0 is a half-day of setup; starting with task 0.1 gives repo structure before diving into core types (Phase 1).
-
-Alternatively, to batch all four phases after repo setup:
-
-```
-/breezing all
-```
-
-This will execute phases in dependency order (0 → 1 → 2 → 3 → 4).
+See `NOTE.md` §7 and `SPEC.md` §7 for v0.2.0+ backlog.

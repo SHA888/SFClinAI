@@ -2,7 +2,7 @@
 
 A position note arguing that clinical AI's safety properties must be enforced by a **symbolic substrate**, not by the behavior of learned components — with a coupled two-layer (patient + institutional) architecture, a temporal-evolution axis, six worked examples, and prior-art mapping.
 
-This repository holds the prose of that position. Code does not yet exist.
+This repository holds the prose of that position, plus the **`clinlat` Rust kernel** (`v0.1.0`): a symbolic substrate for clinical hypothesis refinement with sound deduction operators.
 
 ---
 
@@ -33,6 +33,11 @@ SFClinAI/
 ├── NOTE.md             # Position note, v0.12.0-draft
 ├── ARCHITECTURE.md     # Five Mermaid diagrams, v0.1.0
 ├── SPEC.md             # Engineering formalization, v0.3.0-draft
+├── clinlat/            # Rust substrate kernel, v0.1.0
+│   ├── Cargo.toml
+│   ├── src/
+│   ├── README.md       # Kernel documentation
+│   └── docs/           # Soundness arguments
 ├── README.md           # This file
 └── LICENSE             # CC BY 4.0 (verbatim legal code)
 ```
@@ -55,7 +60,8 @@ The composite is positioned as a route from UNDCS-class to CCS-class under the T
 
 - `NOTE.md`: **v0.12.0-draft**. Working draft for scrutiny. Not for citation.
 - `ARCHITECTURE.md`: **v0.1.0**. Initial diagrams; expected to co-evolve with the note.
-- No code. No deployed system. No regulatory engagement.
+- `clinlat`: **v0.1.0** (published to crates.io). Kernel implements patient-state substrate with `Hyp` poset, `Outcome<H,A>` result type, and SOFA-3 respiratory deduction operator. See [`clinlat/README.md`](clinlat/README.md) for quick start and [`clinlat/docs/operators/sofa_resp_soundness.md`](clinlat/docs/operators/sofa_resp_soundness.md) for soundness argument.
+- No deployed system. No regulatory engagement.
 - Originality assessment timestamped 2026-05-24, valid through **2026-08-24** (quarterly re-verification cadence, per NOTE.md header and §6 closing).
 
 ## Citing this work

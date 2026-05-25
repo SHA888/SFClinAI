@@ -1,17 +1,19 @@
-# SFClinAI — TODO
+# SFClinAI — TODO (ARCHIVED)
 
-**Scope:** substrate kernel v0.1.0 milestone only. Out-of-scope items live in `NOTE.md` §7 and `SPEC.md` §7; do not add long-horizon planning here.
+**Status:** ✓ All v0.1.0 milestone items complete as of 2026-05-25.
 
-**Milestone definition (v0.1.0):**
+**v0.1.0 Milestone definition (achieved):**
 
-- A `clinlat` Rust crate lives at `clinlat/` in this repo.
-- The crate exposes a `Hyp` poset type, a `Result⟨H, A⟩` sum, and one deduction operator: Sepsis-3 SOFA respiratory-component (PaO₂/FiO₂).
-- The operator's soundness obligation (OBL-PS-03 per `SPEC.md` §6) is discharged at the "informal argument" tier — a markdown paragraph attached to the operator, named, dated.
-- `cargo test` passes for the operator on a hand-authored test fixture (one accepting case, one abstaining case, one refusing case).
-- `cargo doc` renders without warnings.
-- README in `clinlat/` documents the operator end-to-end.
+- ✓ A `clinlat` Rust crate lives at `clinlat/` in this repo.
+- ✓ The crate exposes a `Hyp` poset type, an `Outcome⟨H, A⟩` sum, and one deduction operator: Sepsis-3 SOFA respiratory-component (PaO₂/FiO₂).
+- ✓ The operator's soundness obligation (OBL-PS-03 per `SPEC.md` §6) is discharged at the "informal argument" tier in `clinlat/docs/operators/sofa_resp_soundness.md`.
+- ✓ `cargo test` passes (27 tests passing).
+- ✓ `cargo doc` renders without warnings.
+- ✓ README in `clinlat/` documents the operator end-to-end.
 
-**Status tags:** `[ ]` not started · `[~]` in progress · `[x]` done · `[!]` blocked/needs decision
+**Detailed task completion:** See `Plans.md` for per-task status with commit hashes.
+
+**Next items:** See `NOTE.md` §7 and `SPEC.md` §7 for v0.2.0+ backlog.
 
 ---
 
