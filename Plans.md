@@ -24,7 +24,7 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 1.1 | Define `OntologyAdapter` trait signature | `pub trait OntologyAdapter { fn resolve_atom(&self, code: &str, system: OntologySystem) -> Result<Atom, OntologyError>; fn validate_compatibility(&self, atom1: &Atom, atom2: &Atom) -> bool; }` with doc anchoring to DEF-PS-03 | 0.2 | cc:TODO |
+| 1.1 | Define `OntologyAdapter` trait signature | `pub trait OntologyAdapter { fn resolve_atom(&self, code: &str, system: OntologySystem) -> Result<Atom, OntologyError>; fn validate_compatibility(&self, atom1: &Atom, atom2: &Atom) -> bool; }` with doc anchoring to DEF-PS-03 | 0.2 | cc:完了 [97b0304] |
 | 1.2 | Implement `SnomedAdapter` — thin client for SNOMED CT API/snapshot (per M1.1 scope) | Adapter impl with ≥3 example codes; `cargo test` passes; doc refs SNOMED CT Edition reference | 1.1 [tdd:required] | cc:TODO |
 | 1.3 | Implement `RxNormAdapter` — thin client for RxNorm (drugs, strengths) | Adapter impl with ≥3 example drug codes; `cargo test` passes | 1.1 [tdd:required] | cc:TODO |
 | 1.4 | Implement `LoincAdapter` — thin client for LOINC (lab tests, vital signs) | Adapter impl with ≥3 example LOINC codes; `cargo test` passes | 1.1 [tdd:required] | cc:TODO |
