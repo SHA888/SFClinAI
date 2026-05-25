@@ -1,9 +1,9 @@
 # SPEC.md — Substrate-First Clinical AI: Formalization
 
-**Version:** v0.2.0-draft
+**Version:** v0.3.0-draft
 **Status:** Working draft for scrutiny. Not for citation.
 **License:** CC BY 4.0
-**Companion to:** `NOTE.md` v0.11.0-draft
+**Companion to:** `NOTE.md` v0.12.0-draft
 
 ---
 
@@ -472,7 +472,7 @@ _End of §2._
 
 ## §3. Institutional-state substrate
 
-Formalizes `NOTE.md` §4B. This section defines the structure within which an institution's resource-allocation state is represented, updated under operational events, and operated on. The structure parallels §2 by design — `NOTE.md` §4B mirrors §4A — and shared abstractions from §1 are reused.
+Formalizes `NOTE.md` §4B. This section defines the structure within which an institution's resource-allocation state is represented, updated under operational events, and operated on. The structure parallels §2 by design — `NOTE.md` §4B mirrors §4A in form — and shared abstractions from §1 are reused. The mirror is in form, not in substance: `NOTE.md` v0.12.0 §4B intro names the structural asymmetry explicitly (institutional refinement is additionally bounded by physical resource availability, with no patient analog), and that asymmetry surfaces at the formal level in DEF-IS-04 (physical capacity bound), OBL-IS-01 (physical-validity preservation), and the `PhysicalValidityWouldBeViolated` variant of DEF-IS-10 (institutional abstention reason).
 
 Three structural differences from §2 are load-bearing and surfaced as they arise:
 
@@ -786,7 +786,7 @@ A _substrate diff_ is a structured record:
 `patient_locally_optimal: Hyp^P,`
 `institutional_constraint: Cap^P,`
 `infeasibility_reason: AbstainReason_IS,`
-`alternative_feasible_options: Set⟨(Hyp^P, Cap^P)⟩,`
+`alternative_feasible_option: Option⟨(Hyp^P, Cap^P)⟩,`
 `divergence_provenance: Prov`
 `}`
 
@@ -795,7 +795,7 @@ When the patient substrate would refine to `patient_locally_optimal` but no join
 - The hypothesis the patient substrate considers most refined under the evidence.
 - The institutional constraint that prevents joint licensing.
 - The machine-classifiable reason for the institutional refusal.
-- A (possibly empty) set of alternative composite states that _would_ be jointly licensed — these are not the system's choice; they are inputs to a human decision.
+- A (possibly absent) alternative composite state that _would_ be jointly licensed under the institutional constraint — this is the institutionally-actionable plan, not a substrate-selected choice; it is the input the clinician sees alongside the patient-locally-optimal hypothesis.
 - A provenance carrier reconstructing how the divergence arose. ∎
 
 **INV-IX-03 (Joint abstention is not downgrade).** [formalizes: `NOTE.md` §4C.3, "rather than silently downgrading"]
@@ -804,7 +804,7 @@ When `δ_J((h, c), evt) = Abstain(Divergent(diff))`:
 
 1. The composite state is _not_ updated. Neither the patient component nor the institutional component changes as a side effect of computing the diff.
 2. The diff is the substrate's output, exposed to the clinician (or the human decision-making interface) without selection or ranking by the substrate itself.
-3. If the substrate proceeds to apply any subsequent operator, it does so against the unchanged `(h, c)`, not against any element of `alternative_feasible_options`.
+3. If the substrate proceeds to apply any subsequent operator, it does so against the unchanged `(h, c)`, not against `alternative_feasible_option` (if present).
 
 Equivalent statement: divergent joint abstention is observably distinct from picking the locally-feasible option. A black-box test cannot conflate the two. ∎
 
@@ -909,7 +909,7 @@ A comparability statement for a replacing operator is one of:
 
 - **Strict refinement:** `∀ h, e. δ_new(h, e) refines-or-equals δ_old(h, e)` under a stated order on `Result⟨...⟩`.
 - **Strict generalization:** the dual.
-- **Incomparable:** the new operator's refinements are not order-related to the old one's, with a stated rationale for why the change is nevertheless clinically motivated.
+- **Incomparable:** the new operator's refinements are not order-related to the old one's, with a stated rationale for why the change is nevertheless clinically motivated. **Incomparable transitions carry an additional justification burden** (per `NOTE.md` §4D.3): the rationale must be explicit, reviewable, and not absorbed into the operator-version diff. Specifically, an `Incomparable` transition justification must state (a) which clinical judgment the new operator embodies that the old did not, (b) why that judgment supersedes the prior one rather than coexists with it, and (c) the evidence base anchoring the new judgment. A `Refinement` or `Generalization` transition does not require these three elements (the order-theoretic relationship to the prior operator carries part of the justification structurally); an `Incomparable` transition does, because the order-theoretic relationship is absent.
 
 `Incomparable` transitions are permitted but require explicit acknowledgement. They are the case where the new operator embodies a genuinely different clinical judgment, not a sharpening or softening of the old one (worked example in `NOTE.md` §7E.6, the SSC 2021 → 2026 transition). ∎
 
@@ -931,22 +931,33 @@ When an operator-set transition replaces an operator `δ_old`, the substrate emi
 
 with `ReReviewStatus = Pending | ResolvedKeep | ResolvedReplace(new_hyp: Hyp^P, clinician: PrincipalId)`. ∎
 
-**INV-TE-04 (No automatic replacement).** [formalizes: `NOTE.md` §4D.4, "silent drift is structurally forbidden"]
+**DEF-TE-06b (Institutional re-review event).** [formalizes: `NOTE.md` §4D.4, institutional symmetry paragraph]
 
-For an active hypothesis `h^P` with a pending re-review event:
+When an operator-set transition replaces an institutional capacity-update operator `δ_IS_old`, the substrate emits an _institutional re-review event_ for every active capacity hypothesis `c^P` whose provenance includes an allocation through `δ_IS_old`:
 
-1. The substrate does not automatically apply `δ_new` to derive a replacement hypothesis. The active hypothesis remains `h^P` with its original provenance until the re-review event is resolved.
-2. The substrate may compute _what `δ_new` would produce_ and surface that as part of the re-review event's payload, but the surfaced candidate is not the active hypothesis.
-3. Transition from `Pending` to `Resolved*` requires a principal identifier (`PrincipalId`) — a structured token identifying the clinician (or other authorized role) who reviewed the event. ∎
+`InstReReviewEvent = { active_capacity: Cap^P, old_operator: OperatorName × Ver, new_operator: OperatorName × Ver, comparability: ComparabilityStatement, authority_class: AuthorityClass, status: ReReviewStatus }`
+
+where `AuthorityClass ∈ { CapacityManager, EthicsCommittee, FormularyCommittee, ... }` names the institutional authority empowered to resolve this class of re-review (capacity-policy revisions resolve via capacity managers; scarcity-allocation framework revisions via ethics committee; formulary-restriction revisions via formulary committee; the enumeration is per-institution).
+
+The institutional re-review path is structurally identical to DEF-TE-06's patient path: the same `ReReviewStatus` lifecycle, the same provenance discipline, the same prohibition on automatic replacement. The only structural difference is `authority_class`, which routes the event to the appropriate institutional resolver rather than to a bedside clinician. ∎
+
+**INV-TE-04 (No automatic replacement).** [formalizes: `NOTE.md` §4D.4, "silent drift is structurally forbidden" and "unconditional on transition type"]
+
+For an active patient hypothesis `h^P` with a pending re-review event (DEF-TE-06), _and_ for an active institutional capacity hypothesis `c^P` with a pending institutional re-review event (DEF-TE-06b):
+
+1. The substrate does not automatically apply the new operator to derive a replacement hypothesis. The active value remains as-is with its original provenance until the re-review event is resolved.
+2. The substrate may compute _what the new operator would produce_ and surface that as part of the re-review event's payload, but the surfaced candidate is not the active value.
+3. Transition from `Pending` to `Resolved*` requires a principal identifier (`PrincipalId` for patient re-review; an authority within the appropriate `AuthorityClass` for institutional re-review).
+4. This invariant holds **unconditionally on transition type** (DEF-TE-05): even when the new operator strictly refines the old (the new output refines the old output for every input), automatic propagation is forbidden. The "obviously safer" judgment is reserved for human authority. ∎
 
 **OBL-TE-02 (No silent drift).** [formalizes: `NOTE.md` §4D.4]
 
-There is no code path that updates an active patient or institutional hypothesis as a side effect of activating a new operator-set version. The only paths from `h^P_old` (with provenance under `Δ_PS_old`) to `h^P_new` (with provenance under `Δ_PS_new`) are:
+There is no code path that updates an active patient or institutional hypothesis as a side effect of activating a new operator-set version. The only paths from a value `v_old` (with provenance under `Δ_old`) to `v_new` (with provenance under `Δ_new`) are, for both substrates:
 
-1. A re-review event resolved as `ResolvedReplace`, with the new hypothesis carrying provenance to both the resolving principal and `Δ_PS_new`.
-2. Receipt of new evidence that triggers a fresh deduction under `Δ_PS_new` (in which case the active hypothesis updates through the normal §2 path).
+1. A re-review event resolved as `ResolvedReplace`, with the new value carrying provenance to both the resolving authority (clinician for patient re-review; institutional authority for institutional re-review) and `Δ_new`.
+2. Receipt of new evidence that triggers a fresh deduction under `Δ_new` (in which case the active value updates through the normal §2 or §3 path).
 
-Path (1) is the only path that exists _because of_ the operator-set transition. Path (2) is a normal deduction whose currency happens to be after the transition. The two paths are observably distinct in provenance. ∎
+Path (1) is the only path that exists _because of_ the operator-set transition. Path (2) is a normal deduction whose currency happens to be after the transition. The two paths are observably distinct in provenance. This obligation applies symmetrically to `Δ_PS` and `Δ_IS`. ∎
 
 ### §5.5. Evolution-aware provenance
 
@@ -1025,11 +1036,11 @@ In v0.1.0-draft, every obligation is **stated, not discharged**. Discharge mecha
 
 ### §6.4. Temporal evolution (§5)
 
-| Id            | Criticality | Reading                                                                                                                                                                                                                                        | Origin | Expected discharge tier                                             |
-| ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------- |
-| **OBL-TE-01** | F           | No operator-set version may be activated without a stored transition justification (DEF-TE-04) relative to its predecessor; the substrate refuses to load operator-set versions lacking one.                                                   | §5.3   | Type-system enforcement + load-time validation                      |
-| **OBL-TE-02** | P           | The two paths from active hypothesis under `Δ_old` to active hypothesis under `Δ_new` (re-review resolution, fresh deduction with post-transition currency) are exhaustive and observably distinct in provenance; no third silent path exists. | §5.4   | Type-system enforcement + integration test + audit-log verification |
-| **OBL-TE-03** | S           | Version-aware audit queries are answerable from stored provenance alone, without reconstruction of operator state.                                                                                                                             | §5.5   | Provenance-schema validation + query-engine test                    |
+| Id            | Criticality | Reading                                                                                                                                                                                                                                                                                                          | Origin | Expected discharge tier                                             |
+| ------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------- |
+| **OBL-TE-01** | F           | No operator-set version may be activated without a stored transition justification (DEF-TE-04) relative to its predecessor; the substrate refuses to load operator-set versions lacking one.                                                                                                                     | §5.3   | Type-system enforcement + load-time validation                      |
+| **OBL-TE-02** | P           | The two paths from an active value under `Δ_old` to an active value under `Δ_new` (re-review resolution, fresh deduction with post-transition currency) are exhaustive and observably distinct in provenance; no third silent path exists. Applies symmetrically to `Δ_PS` (patient) and `Δ_IS` (institutional). | §5.4   | Type-system enforcement + integration test + audit-log verification |
+| **OBL-TE-03** | S           | Version-aware audit queries are answerable from stored provenance alone, without reconstruction of operator state.                                                                                                                                                                                               | §5.5   | Provenance-schema validation + query-engine test                    |
 
 ### §6.5. Tally and criticality distribution
 
@@ -1041,7 +1052,7 @@ In v0.1.0-draft, every obligation is **stated, not discharged**. Discharge mecha
 
 The distribution matters for architectural planning: roughly a third of obligations live in the type system (so the build system can enforce them), roughly a third live in test infrastructure (so CI can enforce them per the meta-rule that principles without enforcement are decoration), and roughly a third live in runtime/audit (so they are observable in operation rather than at build time).
 
-**Criticality distribution (derived from NOTE.md v0.11.0 §4 tier assignments):**
+**Criticality distribution (derived from NOTE.md v0.12.0 §4 tier assignments):**
 
 - **P (Position-critical):** 5 obligations — OBL-PS-02, OBL-IS-03, OBL-IX-02, OBL-IX-03, OBL-TE-02.
 - **S (Safety-property):** 10 obligations — OBL-PS-01, OBL-PS-03, OBL-PS-04, OBL-PS-05, OBL-IS-01, OBL-IS-02, OBL-IS-04, OBL-IS-05, OBL-IS-06, OBL-TE-03.
@@ -1062,3 +1073,85 @@ The inverse query — "for obligation OBL-XX-NN, which principles license it, an
 ---
 
 _End of §6._
+
+## §7. Open formal questions and deferred commitments
+
+This section catalogs questions surfaced during §1–§6 drafting that v0.2.0-draft does not resolve. Three categories:
+
+- **Deferred resolution** — the question is real, an answer is needed, but v0.2 is the wrong revision to commit. Each entry names the disposition (which future revision, what would trigger commitment).
+- **Pending NOTE.md confirmation** — SPEC.md makes a claim stronger than the corresponding NOTE.md principle plainly licenses. Each entry names what would need to change in `NOTE.md` (or in SPEC.md) to resolve the asymmetry.
+- **Structural choice under uncertainty** — a commitment was made under absent or weak evidence; revision is plausible.
+
+Numbering: open questions are tagged `OQ-{section}-{NN}` where section ∈ {MP, PS, IS, IX, TE, X} (X = cross-cutting). The naming mirrors `OBL-*` so a reader can scan obligations and open questions side by side.
+
+### §7.1. Mathematical preliminaries (§1)
+
+**OQ-MP-01 — INV-MP-02 deflationary/inflationary orientation.** SPEC.md §1.4 stated that `α ∘ γ` is deflationary on `A` and `γ ∘ α` is inflationary on `C`, with a parenthetical noting that Cousot & Cousot (1977) use the dual convention depending on which side is treated as "abstract." The orientation is correct for the use SPEC.md makes of it in §2.3 (`A = Hyp`, `C = Obs`), but the convention should be explicitly verified at each substrate instantiation. _Disposition:_ resolved when §8 traceability adds per-substrate orientation checks.
+
+**OQ-MP-02 — `Result⟨H, R⟩` name collision with Rust's `Result<T, E>`.** DEF-MP-13 reserves the name `Result` for the operator-output sum type. Rust's standard `Result<T, E>` has `Ok` and `Err` constructors with error-channel semantics; SPEC.md's `Result⟨H, R⟩` has `Refined` and `Abstain` constructors with epistemic-state semantics. The collision is documented in DEF-MP-13's text, not resolved. _Disposition:_ candidate rename to `Outcome⟨H, R⟩` in v0.3.x if downstream confusion is observed during ARCHITECTURE.md drafting; no commitment yet.
+
+**OQ-MP-03 — Provenance carrier algebra.** DEF-MP-14 specifies `Prov` as an associative-identity monoid with a `derives_from` predicate. This is the minimum interface SPEC.md depends on. Whether the concrete provenance encoding (Merkle DAG, signed event chain, content-addressed graph) preserves additional properties — for example, commutativity in cases where derivation order is irrelevant — is left open. _Disposition:_ deferred to ARCHITECTURE.md; SPEC.md should not commit further.
+
+### §7.2. Patient substrate (§2)
+
+**OQ-PS-01 — Existence of a bottom element in `Hyp`.** DEF-PS-11's text noted that SPEC.md does not commit to whether `Hyp` has a bottom element `⊥_PS`, and that if one exists it represents "a maximally-specific patient state consistent with all observations" — a different concept from abstention. The question is open. _Disposition:_ defer to v0.x revision when a concrete clinical scenario forces a commitment. Plausible answer: `⊥_PS` does not exist as a substrate-level element, because no maximally-specific patient state is generally constructible from finite observations; the partial-meet structure handles this without needing a bottom.
+
+**OQ-PS-02 — DEF-PS-15.2 "at most one refinement step." [RESOLVED in v0.3.0 — NOTE.md v0.12.0 §4A.5]** The proposer codomain is constrained to "candidates that could plausibly come out of some `δ ∈ Δ_PS` from this evidence." `NOTE.md` v0.12.0 §4A.5 now explicitly states "The proposer's output space is bounded to candidates the deduction operator set could in principle produce from the available evidence — multi-step refinements that would require a chain of operator applications are not proposer-level outputs." SPEC.md DEF-PS-15.2 stands as the correct formalization.
+
+**OQ-PS-03 — DEF-PS-08 soundness condition: conjunction of two clauses. [RESOLVED in v0.3.0 — NOTE.md v0.12.0 §4A.2]** SPEC.md defined operator soundness as: refined output must (a) refine the input hypothesis _and_ (b) refine `α_PS(o_e)`. `NOTE.md` v0.12.0 §4A.2 now explicitly states "A licensed refinement is sound only if it is both (a) at least as specific as the prior state — refinement does not generalize — and (b) supported by the cited evidence: a hypothesis refinement that the evidence does not entail is unsound regardless of operator licensing." SPEC.md DEF-PS-08's conjunction reading stands.
+
+### §7.3. Institutional substrate (§3)
+
+**OQ-IS-01 — Physical validity inside DEF-IS-08 versus as a separate invariant.** SPEC.md folded physical-validity preservation into DEF-IS-08's third clause, making "sound capacity-update operator" mean physical-validity-preserving by definition. The alternative is to leave physical validity as INV-IS-only and treat it as an invariant a separately-defined-sound operator must additionally satisfy. The current formulation is more committal but the right one if physical validity is conceptually inseparable from soundness in the institutional substrate. _Structural choice under uncertainty._ Revisit if a clinical scenario demonstrates a useful "physically-invalid but operator-sound" intermediate state.
+
+**OQ-IS-02 — DEF-IS-11 (allocation abstention is not stalling). [RESOLVED in v0.3.0 — NOTE.md v0.12.0 §4B.3]** SPEC.md committed that `Abstain(r)` is structurally distinct from timeout, crash, or silent-default. `NOTE.md` v0.12.0 §4B.3 now states "This abstention is a structurally distinct output — observably different in the audit trail from a timeout, a crash, or a default-fallthrough; the substrate guarantees that every allocation decision yields either a licensed allocation or an explicit abstention in bounded steps, never silent failure." DEF-IS-11 stands as the correct formalization.
+
+**OQ-IS-03 — Institutional re-review event under §5.4. [RESOLVED in v0.3.0 — DEF-TE-06b added; NOTE.md v0.12.0 §4D.4 institutional symmetry paragraph]** §5.4 now formalizes the institutional analog via `DEF-TE-06b` (`InstReReviewEvent`) and OBL-TE-02 expands to span both substrates. The architecture's silent-drift prohibition now applies symmetrically to clinical recommendations and to allocation decisions.
+
+### §7.4. Interaction layer (§4)
+
+**OQ-IX-01 — SubstrateDiff.alternative_feasible_option. [RESOLVED in v0.3.0 — SPEC.md weakened]** DEF-IX-09 originally specified `alternative_feasible_options: Set⟨...⟩`. `NOTE.md` v0.12.0 §4C.1 retained its singular-pair reading ("the unconstrained-optimal recommendation and the institutionally-actionable plan"). Resolution: SPEC.md weakens to `alternative_feasible_option: Option⟨(Hyp^P, Cap^P)⟩`. The set-of-alternatives reading was an SPEC.md overreach; the substrate produces at most one alternative — the institutionally-actionable plan — alongside the patient-locally-optimal hypothesis.
+
+**OQ-IX-02 — DEF-IX-05 joint operator decomposition.** SPEC.md committed that every joint operator decomposes as `(δ_PS', δ_IS', coupling_check)`. This forbids monolithic joint operators not traceable to substrate-local ones. The decomposition discipline is what makes INV-IX-04 (substrate independence) provable, but it reduces expressiveness. _Structural choice under uncertainty._ Revisit if a clinical scenario requires a joint operator that resists clean decomposition. The patient/institutional pair was designed to be modular precisely to enable this discipline; if the modularity holds in practice, the choice is sound.
+
+**OQ-IX-03 — INV-IX-03 strength (no silent downgrade). [RESOLVED in v0.3.0 — NOTE.md v0.12.0 §4C.1]** SPEC.md's strongest claim: the substrate produces a `Divergent(diff)` abstention rather than silently picking the institutionally-feasible refinement. `NOTE.md` v0.12.0 §4C.1 now explicitly states "This is a structural property of the substrate, not a behavioral preference: silent downgrade is observably distinct in the audit trail from divergent licensing, and the architecture forbids the path that would produce silent downgrade rather than rely on the learned components to avoid it." INV-IX-03 stands as the correct formalization.
+
+### §7.5. Temporal evolution (§5)
+
+**OQ-TE-01 — DEF-TE-05 `Incomparable` category licensing. [RESOLVED in v0.3.0 — NOTE.md v0.12.0 §4D.3 + DEF-TE-05 updated]** SPEC.md committed to three comparability-statement categories: `Refinement`, `Generalization`, `Incomparable`. The escape-hatch risk (every transition becoming `Incomparable`) is now closed by `NOTE.md` v0.12.0 §4D.3's explicit asymmetric justification burden and the corresponding tightening in DEF-TE-05, which now requires `Incomparable` transitions to state (a) which clinical judgment the new operator embodies, (b) why that judgment supersedes the prior one, and (c) the evidence base anchoring the new judgment. `Refinement` and `Generalization` transitions carry the order-theoretic relationship as part of their structural justification; `Incomparable` transitions must provide it explicitly.
+
+**OQ-TE-02 — INV-TE-04 strength (no automatic replacement under any transition). [RESOLVED in v0.3.0 — NOTE.md v0.12.0 §4D.4]** SPEC.md committed that active hypotheses with pending re-reviews stay as-is even when the new operator is strictly better. `NOTE.md` v0.12.0 §4D.4 now states this unconditionally: "This commitment is unconditional on transition type — even when the new operator strictly refines the old (the new recommendation is at least as specific and at least as cautious as the old), automatic propagation is forbidden." INV-TE-04 has been updated to reflect this explicitly (clause 4 of the invariant).
+
+**OQ-TE-03 — Currency thresholds and freshness-class enumeration.** DEF-TE-02 named four freshness classes (`Realtime`, `Recent`, `Stale`, `Historical`) without committing to threshold values or to whether the enumeration is exhaustive. The thresholds are correctly an architectural choice (per §0.5 exclusions). _Disposition:_ deferred to ARCHITECTURE.md; the enumeration set itself may need extension when concrete clinical evidence-currency vocabularies are surveyed.
+
+### §7.6. Cross-cutting and structural
+
+**OQ-X-01 — F-count asymmetry between NOTE.md and SPEC.md.** `NOTE.md` v0.11.0 §4 yields 3 F-tier principles (4C.2, 4D.1, 4D.2). SPEC.md §6 yields 2 F-tier obligations (OBL-IX-01, OBL-TE-01). The difference is structural: §4D.2 (currency tracking) and parts of §4D.1 (versioning) are formalized through definitions (DEF-TE-01, DEF-TE-02, DEF-TE-03, INV-TE-01, INV-TE-02) without producing a discharge-bearing obligation. _Disposition:_ either add a missing obligation (e.g., "OBL-TE-04: currency-aware operator behavior is enforceable") or document the asymmetry as expected. The latter is the v0.2 choice; revisit in v0.3.x if a discharge mechanism for these foundational properties surfaces during ARCHITECTURE.md drafting.
+
+**OQ-X-02 — Bidirectional traceability formalization (§8).** §8 (NOTE.md ↔ SPEC.md bidirectional table) is pending in v0.2.0-draft. The §0.1 commitment that "clinicians scrutinize SPEC.md via §8" is unmet until §8 lands. _Disposition:_ drafted in the v0.2.x cycle; §8 is required-before-v1.0 but the format (markdown table, separate file, generated artifact) is open.
+
+**OQ-X-03 — Discharge mechanism for "informal argument" obligations.** OBL-PS-03 and OBL-IS-04 expect discharge via "per-operator informal argument in v0.1; mechanized proof candidate later." The informal-argument form is an obvious soft spot: a one-paragraph English justification for each operator's soundness, attached to that operator's definition, with no machine-checkable property tying the argument to the operator's actual behavior. _Disposition:_ unresolved by design. Mechanization is a v1.x or v2.x destination per §0.2 Tier C path; in v0.x, the informal arguments accumulate as text and the gap between argument and behavior is named, not closed.
+
+**OQ-X-04 — Composite-substrate-state invariants beyond product structure.** DEF-IX-03 stated that the composite state `S = Hyp^P × Cap^P` is "not itself a poset with new structure — it is the product poset." This may be too modest. A composite refinement that is licensed under §4C may carry invariants that neither component does alone — for example, "every active institutional bed allocation has a corresponding active patient hypothesis." _Disposition:_ defer to v0.3.x. Surfacing concrete composite invariants requires worked examples that v0.2 does not include.
+
+**OQ-X-05 — Concurrency and observation atomicity.** SPEC.md is silent on concurrent operator application. Two operators applied simultaneously to the same composite state may produce a result no sequential ordering produces. The patient substrate (one per patient) bounds this to within-patient races; the institutional substrate is genuinely concurrent across patients. _Disposition:_ deferred to ARCHITECTURE.md and beyond. A formal treatment requires committing to a concurrency model (linearizability, serializability, CRDT-style commutative composition); SPEC.md should not pre-commit at v0.2.
+
+### §7.7. Resolution path
+
+Each open question above carries a disposition. Summarizing across categories (status as of v0.3.0-draft):
+
+- **Resolved in v0.3.0** (closed by NOTE.md v0.12.0 strengthening or by corresponding SPEC.md weakening): OQ-PS-02, OQ-PS-03, OQ-IS-02, OQ-IS-03, OQ-IX-01, OQ-IX-03, OQ-TE-01, OQ-TE-02. **Eight items closed.**
+- **Deferred to v0.4.x or later** (revisit when ARCHITECTURE.md drafting or worked examples force commitment): OQ-MP-02, OQ-MP-03, OQ-IX-02, OQ-TE-03, OQ-X-01, OQ-X-04, OQ-X-05. Seven items.
+- **Structural choice under uncertainty** (commitment made; revisit if downstream surface area reveals the choice was wrong): OQ-IS-01, OQ-IX-02 (also listed above). Two items, one overlapping.
+- **Required before v1.0** (cannot ship a stable v1 with these open): OQ-X-02 (§8 bidirectional traceability), OQ-X-03 (informal-argument discharge). Two items.
+- **Confined to within-section disposition** (resolved per concrete clinical instantiation): OQ-MP-01, OQ-PS-01. Two items.
+
+Total: 20 open questions originally; 8 resolved in v0.3.0; **12 remain open**.
+
+The **Pending NOTE.md confirmation** bucket — six items at v0.2.0 — is now empty. Five of the six were resolved by NOTE.md v0.12.0 strengthening; one (OQ-IX-01) was resolved by SPEC.md weakening to match NOTE.md's singular-pair reading. This is the cleanest possible disposition of that bucket: every formalization-vs-prose ambiguity was decided explicitly rather than left unresolved.
+
+The largest remaining bucket is **Deferred to v0.4.x or later** — these will surface again during ARCHITECTURE.md drafting and worked-example construction, where downstream commitments may force resolution.
+
+---
+
+_End of §7._
