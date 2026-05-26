@@ -598,21 +598,26 @@ mod proptest_galois_laws {
     use proptest::prelude::*;
     use std::collections::BTreeMap;
 
+    fn system_strategy() -> impl Strategy<Value = OntologySystem> {
+        prop_oneof![
+            Just(OntologySystem::SNOMED),
+            Just(OntologySystem::LOINC),
+            Just(OntologySystem::RxNorm),
+            Just(OntologySystem::ICD11),
+        ]
+    }
+
+    fn system_token_strategy() -> impl Strategy<Value = &'static str> {
+        prop_oneof![Just("SNOMED"), Just("LOINC"), Just("RxNorm"), Just("ICD11"),]
+    }
+
     fn atom_strategy() -> impl Strategy<Value = Atom> {
         (
-            prop::option::of("[A-Z0-9]{1,6}"),
+            system_strategy(),
             "[0-9]{4,5}",
             "[A-Z][a-z]{3,8}",
             "0\\.[0-9]\\.[0-9]",
         )
-            .prop_flat_map(|(sys_opt, code, term, ver)| {
-                let system = if sys_opt.is_some() {
-                    OntologySystem::LOINC
-                } else {
-                    OntologySystem::SNOMED
-                };
-                Just((system, code.to_string(), term.to_string(), ver.to_string()))
-            })
             .prop_map(|(system, code, preferred_term, version)| Atom {
                 system,
                 code,
@@ -631,42 +636,120 @@ mod proptest_galois_laws {
         })
     }
 
+    fn observation_code_strategy() -> impl Strategy<Value = String> {
+        (system_token_strategy(), "[0-9]{3,5}").prop_map(|(sys, code)| format!("{}:{}", sys, code))
+    }
+
     fn evidence_strategy() -> impl Strategy<Value = Evidence> {
-        (prop::collection::vec("[A-Z]+:[0-9]+", 0..4), "[0-9]{1,3}").prop_map(|(codes, val_str)| {
-            let observations: Vec<Observation> = codes
-                .into_iter()
-                .map(|code| Observation::new(code, serde_json::json!(val_str.clone())))
-                .collect();
+        (
+            prop::collection::vec(observation_code_strategy(), 0..4),
+            "[0-9]{1,3}",
+        )
+            .prop_map(|(codes, val_str)| {
+                let observations: Vec<Observation> = codes
+                    .into_iter()
+                    .map(|code| Observation::new(code, serde_json::json!(val_str.clone())))
+                    .collect();
 
-            let origin = ProvenanceOrigin::new("test_gen", "SNOMED", "synthetic");
-            let prov = Provenance::new(
-                origin,
-                chrono::Utc::now(),
-                crate::Ver::new("clinlat", "proptest", "0.2.0"),
-                BTreeMap::new(),
-            );
+                let origin = ProvenanceOrigin::new("test_gen", "SNOMED", "synthetic");
+                let prov = Provenance::new(
+                    origin,
+                    chrono::Utc::now(),
+                    crate::Ver::new("clinlat", "proptest", "0.2.0"),
+                    BTreeMap::new(),
+                );
 
-            Evidence::new(observations, prov)
-        })
+                Evidence::new(observations, prov)
+            })
+    }
+
+    /// Strategy that generates a (subset, superset) pair of evidence with the same provenance.
+    /// `e_full` contains all observations of `e_sub` plus zero or more extra observations.
+    /// Used to test genuine monotonicity of α_PS.
+    fn monotone_evidence_pair() -> impl Strategy<Value = (Evidence, Evidence)> {
+        (
+            prop::collection::vec(observation_code_strategy(), 1..3),
+            prop::collection::vec(observation_code_strategy(), 0..3),
+        )
+            .prop_map(|(base_codes, extra_codes)| {
+                let origin = ProvenanceOrigin::new("test_gen", "SNOMED", "synthetic");
+                let prov = Provenance::new(
+                    origin,
+                    chrono::Utc::now(),
+                    crate::Ver::new("clinlat", "proptest", "0.2.0"),
+                    BTreeMap::new(),
+                );
+
+                let base_obs: Vec<Observation> = base_codes
+                    .iter()
+                    .map(|c| Observation::new(c.clone(), serde_json::json!("1")))
+                    .collect();
+                let mut full_obs = base_obs.clone();
+                full_obs.extend(
+                    extra_codes
+                        .iter()
+                        .map(|c| Observation::new(c.clone(), serde_json::json!("1"))),
+                );
+
+                (
+                    Evidence::new(base_obs, prov.clone()),
+                    Evidence::new(full_obs, prov),
+                )
+            })
     }
 
     proptest! {
+        /// INV-MP-02 property 2: γ ∘ α is inflationary on Evidence.
+        /// ∀ e. e ⊑_γ γ(α(e))  ⟺  is_consistent_with(α(e), e)
+        ///
+        /// This is the upper-adjoint (unit) direction of the Galois adjunction.
+        /// The lower-adjoint (deflationary) direction α(γ(h)) ⊑ h is not
+        /// directly testable because γ_PS is encoded as a predicate, not as a
+        /// concrete set-returning function (see DEF-PS-06 implementation note).
         #[test]
-        fn prop_lower_adjoint_law(e in evidence_strategy()) {
+        fn prop_upper_adjoint_inflationary(e in evidence_strategy()) {
             let alpha_e = abstract_evidence(&e);
             prop_assert!(is_consistent_with(&alpha_e, &e),
-                "Lower adjoint law violated: evidence should be consistent with its abstraction");
+                "Upper-adjoint inflationary law violated: e ⊑_γ γ(α(e))");
         }
 
+        /// α_PS is monotone (DEF-MP-06): extending evidence cannot remove
+        /// atoms from the abstraction. Formally: e_sub.obs ⊆ e_full.obs
+        /// implies atoms(α(e_sub)) ⊆ atoms(α(e_full)) (as sets).
+        ///
+        /// Generates a (subset, superset) evidence pair sharing provenance and
+        /// asserts atom-set inclusion. Replaces the prior tautological test.
         #[test]
-        fn prop_lower_adjoint_always_consistent(e1 in evidence_strategy(), e2 in evidence_strategy()) {
-            let alpha_e1 = abstract_evidence(&e1);
-            let alpha_e2 = abstract_evidence(&e2);
+        fn prop_alpha_monotone(pair in monotone_evidence_pair()) {
+            let (e_sub, e_full) = pair;
+            let alpha_sub = abstract_evidence(&e_sub);
+            let alpha_full = abstract_evidence(&e_full);
 
-            prop_assert!(is_consistent_with(&alpha_e1, &e1),
-                "Evidence should always be consistent with its own abstraction (e1)");
-            prop_assert!(is_consistent_with(&alpha_e2, &e2),
-                "Evidence should always be consistent with its own abstraction (e2)");
+            let sub_atoms: std::collections::HashSet<&Atom> = alpha_sub.atoms().iter().collect();
+            let full_atoms: std::collections::HashSet<&Atom> = alpha_full.atoms().iter().collect();
+
+            prop_assert!(sub_atoms.is_subset(&full_atoms),
+                "α monotonicity violated: atoms(α(e_sub))={:?} should be a subset of atoms(α(e_full))={:?}",
+                sub_atoms, full_atoms);
+        }
+
+        /// γ_PS (predicate form) is antitone in h: if h_specific ⊑ h_general
+        /// (h_specific has more atoms) and e is consistent with h_specific,
+        /// then e is consistent with h_general. Equivalently, the set of
+        /// evidence consistent with h shrinks monotonically as h is refined.
+        #[test]
+        fn prop_gamma_antitone_in_hyp(pair in monotone_evidence_pair()) {
+            let (e_sub, e_full) = pair;
+            let h_general = abstract_evidence(&e_sub);
+            let h_specific = abstract_evidence(&e_full);
+
+            // h_specific refines h_general (more atoms). Any evidence consistent
+            // with the more-specific hypothesis must be consistent with the
+            // more-general one.
+            if is_consistent_with(&h_specific, &e_full) {
+                prop_assert!(is_consistent_with(&h_general, &e_full),
+                    "γ antitonicity in h violated: e is consistent with h_specific but not h_general");
+            }
         }
 
         #[test]
@@ -687,19 +770,6 @@ mod proptest_galois_laws {
         }
 
         #[test]
-        fn prop_consistency_transitive(e in evidence_strategy()) {
-            let alpha_e = abstract_evidence(&e);
-
-            if !alpha_e.atoms().is_empty() {
-                prop_assert!(is_consistent_with(&alpha_e, &e),
-                    "Abstraction must be consistent with original evidence");
-            } else {
-                prop_assert!(is_consistent_with(&Hyp::unknown(), &e),
-                    "Unknown should be consistent with any evidence");
-            }
-        }
-
-        #[test]
         fn prop_unknown_consistent_with_all(e in evidence_strategy()) {
             let unknown = Hyp::unknown();
             prop_assert!(is_consistent_with(&unknown, &e),
@@ -708,16 +778,9 @@ mod proptest_galois_laws {
 
         #[test]
         fn prop_abstraction_completeness(
-            systems in prop::collection::vec("SNOMED|LOINC|RxNorm|ICD11", 1..4),
-            codes in prop::collection::vec("[0-9A-Z]{4,8}", 1..4),
+            codes in prop::collection::vec(observation_code_strategy(), 1..4),
         ) {
-            let obs_codes: Vec<String> = systems
-                .iter()
-                .zip(codes.iter())
-                .map(|(sys, code)| format!("{}:{}", sys, code))
-                .collect();
-
-            let observations: Vec<Observation> = obs_codes
+            let observations: Vec<Observation> = codes
                 .iter()
                 .map(|code| Observation::new(code.clone(), serde_json::json!(1)))
                 .collect();
@@ -733,55 +796,87 @@ mod proptest_galois_laws {
 
             let hyp = abstract_evidence(&evidence);
 
-            prop_assert_eq!(hyp.atoms().len(), obs_codes.len(),
+            prop_assert_eq!(hyp.atoms().len(), codes.len(),
                 "All valid observation codes should produce atoms");
             prop_assert!(is_consistent_with(&hyp, &evidence),
                 "Abstraction should be consistent with evidence");
         }
 
+        /// Consistency is reflexive on the top element: Unknown is consistent
+        /// with every Evidence (including its trivially-abstracted empty form).
         #[test]
-        fn prop_consistency_reflexive(h in hyp_strategy()) {
-            if h == Hyp::unknown() {
-                let empty_evidence = Evidence::new(
-                    vec![],
-                    Provenance::new(
-                        ProvenanceOrigin::new("empty", "N/A", "none"),
-                        chrono::Utc::now(),
-                        crate::Ver::new("clinlat", "test", "0.1.0"),
-                        BTreeMap::new(),
-                    ),
-                );
-                prop_assert!(is_consistent_with(&h, &empty_evidence),
-                    "Unknown should be consistent with empty evidence");
+        fn prop_consistency_unknown_reflexive(e in evidence_strategy()) {
+            prop_assert!(is_consistent_with(&Hyp::unknown(), &e),
+                "Unknown should be consistent with every evidence packet");
+        }
+
+        /// α_PS is deterministic: applying it twice to the same evidence
+        /// produces the same atom multiset. Required for the Galois connection
+        /// to be well-defined.
+        #[test]
+        fn prop_alpha_deterministic(e in evidence_strategy()) {
+            let alpha_1 = abstract_evidence(&e);
+            let alpha_2 = abstract_evidence(&e);
+            prop_assert_eq!(alpha_1, alpha_2,
+                "α should be deterministic: two calls on the same evidence must agree");
+        }
+
+        /// Round-trip consistency: a hand-crafted hypothesis is consistent
+        /// with evidence whose observations encode the same atoms (under a
+        /// shared provenance version). Exercises the predicate-form γ_PS.
+        #[test]
+        fn prop_atom_set_consistency(h in hyp_strategy()) {
+            // Build evidence whose abstraction reproduces h's atoms.
+            let observations: Vec<Observation> = h
+                .atoms()
+                .iter()
+                .filter_map(|atom| {
+                    let sys_token = match atom.system {
+                        OntologySystem::SNOMED => "SNOMED",
+                        OntologySystem::LOINC => "LOINC",
+                        OntologySystem::RxNorm => "RxNorm",
+                        OntologySystem::ICD11 => "ICD11",
+                        OntologySystem::Unstructured => return None,
+                    };
+                    Some(Observation::new(
+                        format!("{}:{}", sys_token, atom.code),
+                        serde_json::json!(1),
+                    ))
+                })
+                .collect();
+
+            // Skip if any atom is Unstructured (not generated by our strategy
+            // but kept defensive in case the strategy expands).
+            if observations.len() != h.atoms().len() {
+                return Ok(());
             }
-        }
 
-        #[test]
-        fn prop_abstraction_monotone(e1 in evidence_strategy(), e2 in evidence_strategy()) {
-            let alpha_e1 = abstract_evidence(&e1);
-            let alpha_e2 = abstract_evidence(&e2);
+            let origin = ProvenanceOrigin::new("rt", "SNOMED", "code");
+            // Provenance build version must match h.atoms[*].version so the
+            // parsed atom is compatible with the hand-crafted one.
+            let version = h
+                .atoms()
+                .first()
+                .map(|a| a.version.clone())
+                .unwrap_or_else(|| "0.0.0".to_string());
+            let prov = Provenance::new(
+                origin,
+                chrono::Utc::now(),
+                crate::Ver::new("clinlat", "test", &version),
+                BTreeMap::new(),
+            );
+            let evidence = Evidence::new(observations, prov);
 
-            let atoms_e1 = alpha_e1.atoms().len();
-            let atoms_e2 = alpha_e2.atoms().len();
-
-            prop_assert!(atoms_e1 <= atoms_e1 + 1 && atoms_e2 <= atoms_e2 + 1,
-                "Abstraction should be deterministic");
-        }
-
-        #[test]
-        fn prop_monotone_abstraction(e1 in evidence_strategy(), e2 in evidence_strategy()) {
-            let alpha_e1 = abstract_evidence(&e1);
-            let alpha_e2 = abstract_evidence(&e2);
-
-            prop_assert!(is_consistent_with(&alpha_e1, &e1),
-                "First abstraction should be consistent with its evidence");
-            prop_assert!(is_consistent_with(&alpha_e2, &e2),
-                "Second abstraction should be consistent with its evidence");
-
-            prop_assert_eq!(alpha_e1.atoms().len(), alpha_e1.atoms().len(),
-                "Abstraction should be deterministic");
-            prop_assert_eq!(alpha_e2.atoms().len(), alpha_e2.atoms().len(),
-                "Abstraction should be deterministic");
+            // Require uniform version across atoms or skip — otherwise the
+            // round-trip would only match the first atom's version.
+            let uniform_version = h
+                .atoms()
+                .iter()
+                .all(|a| a.version == version);
+            if uniform_version {
+                prop_assert!(is_consistent_with(&h, &evidence),
+                    "Round-trip α(γ_atoms(h)) should be consistent with h when versions align");
+            }
         }
     }
 }

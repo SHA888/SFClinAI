@@ -9,6 +9,7 @@
 
 use crate::ontology::Atom;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
 /// A clinical hypothesis: a refinable set of resolved atoms.
 ///
@@ -80,25 +81,32 @@ impl Hyp {
 }
 
 impl PartialOrd for Hyp {
-    /// Compares two hypotheses by refinement order.
+    /// Compares two hypotheses by refinement order via atom-set inclusion.
     ///
-    /// Returns `Some(Ordering::Less)` if `self` refines `other` (is more specific).
-    /// Returns `Some(Ordering::Greater)` if `self` is refined by `other` (is more general).
-    /// Returns `Some(Ordering::Equal)` if `self == other`.
+    /// `self ⊑ other` (self refines other) iff `self.atoms() ⊇ other.atoms()` as sets:
+    /// more atoms = more specific (more refined). The empty atom set (`Unknown`) is
+    /// the top element; every hypothesis refines it.
     ///
-    /// Returns `None` if `self` and `other` are incomparable.
+    /// - `Some(Less)`: `self` refines `other` (self has strictly more atoms).
+    /// - `Some(Greater)`: `other` refines `self` (self has strictly fewer atoms).
+    /// - `Some(Equal)`: atom sets coincide.
+    /// - `None`: atom sets are incomparable (neither is a subset of the other).
+    ///
+    /// This implementation aligns `Hyp::PartialOrd` with the formal `⊑_PS` semantics
+    /// used in the OBL-PS-02 proof sketch and required for the Galois adjunction
+    /// `α_PS(e) ⊑ h ⟺ atoms(α_PS(e)) ⊇ atoms(h)` to hold beyond Unknown.
     ///
     /// Implements DEF-PS-01 refinement order.
     fn partial_cmp(&self, other: &Hyp) -> Option<Ordering> {
-        match (self, other) {
-            // Equal hypotheses.
-            _ if self == other => Some(Ordering::Equal),
-            // Unknown is the top element; any hypothesis refines Unknown.
-            (_, _) if other.is_unknown() => Some(Ordering::Less),
-            // Any hypothesis is refined by Unknown.
-            (_, _) if self.is_unknown() => Some(Ordering::Greater),
-            // Incomparable hypotheses (no ordering relationship).
-            _ => None,
+        let self_atoms: HashSet<&Atom> = self.atoms().iter().collect();
+        let other_atoms: HashSet<&Atom> = other.atoms().iter().collect();
+        let self_subset_of_other = self_atoms.is_subset(&other_atoms);
+        let other_subset_of_self = other_atoms.is_subset(&self_atoms);
+        match (self_subset_of_other, other_subset_of_self) {
+            (true, true) => Some(Ordering::Equal),
+            (false, true) => Some(Ordering::Less), // self has strictly more atoms => more refined
+            (true, false) => Some(Ordering::Greater), // self has strictly fewer atoms => more general
+            (false, false) => None,
         }
     }
 }
@@ -166,6 +174,17 @@ mod tests {
         assert_eq!(h1.partial_cmp(&h2), None);
         // Incomparable hypotheses are not compatible (unless one is Unknown).
         assert!(!h1.compat(&h2));
+    }
+
+    #[test]
+    fn test_subset_refinement() {
+        // Atom-set inclusion: a superset hypothesis refines the subset one.
+        let h_general = Hyp::new(vec![atom_diagnosis_a()]);
+        let h_specific = Hyp::new(vec![atom_diagnosis_a(), atom_severity_high()]);
+
+        // h_specific refines h_general (more atoms => more specific).
+        assert_eq!(h_specific.partial_cmp(&h_general), Some(Ordering::Less));
+        assert_eq!(h_general.partial_cmp(&h_specific), Some(Ordering::Greater));
     }
 
     #[test]
