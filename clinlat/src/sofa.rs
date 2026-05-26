@@ -245,25 +245,24 @@ impl Operator for SofaRespOperator {
     }
 }
 
-/// Standalone function for SOFA respiratory scoring.
+/// Standalone helper that maps a PaO₂/FiO₂ ratio to a SOFA respiratory score.
 ///
-/// This function implements the actual scoring logic, independent of the generic
-/// `Operator` trait (which uses unit `Evidence` in v0.1.0).
+/// This is a thin numeric helper exposed for callers that only need the scoring
+/// rule in isolation (e.g., bench tooling, exploratory analysis). The full
+/// substrate API path is [`SofaRespOperator::apply`], which validates evidence
+/// provenance, enforces the version invariant (INV-PS-05), and returns a typed
+/// [`crate::Outcome`].
 ///
 /// # Arguments
 ///
 /// - `ratio`: PaO₂/FiO₂ ratio in mmHg.
-/// - `on_mech_vent`: Whether patient is on mechanical ventilation.
+/// - `on_mech_vent`: Whether the patient is on mechanical ventilation.
 ///
 /// # Returns
 ///
 /// - `Some(score)`: The computed SOFA respiratory score (0–4).
-/// - `None`: If preconditions are unmet (score ≥3 without ventilation).
-///
-/// # Note
-///
-/// This is a temporary implementation for v0.1.0. In v0.2.0+, the operator will
-/// accept structured `Evidence` and return `Outcome<Hyp, AbstainReason>`.
+/// - `None`: If preconditions are unmet (score ≥3 requires mechanical ventilation
+///   per Sepsis-3).
 pub fn score_from_ratio(ratio: f64, on_mech_vent: bool) -> Option<u8> {
     let score = if ratio >= SOFA_SCORE_0_MIN {
         0

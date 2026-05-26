@@ -61,11 +61,26 @@
 //! assert_eq!(score, Some(1));
 //! ```
 //!
-//! ## v0.2.0 Deferrals
+//! ## v0.2.0-alpha Status
 //!
-//! - [`operator::Evidence`] is a unit type in the generic trait; concrete operators
-//!   (like [`sofa::SofaRespOperator`]) define richer evidence types.
-//! - Provenance is unit `()`; timestamped lineage is deferred to v0.3.
+//! Shipped (Phases 0–2 of the M1 milestone):
+//!
+//! - [`Atom`] replaces the v0.1.0 `&'static str` AtomId; resolved through four
+//!   [`OntologyAdapter`] implementations (SNOMED CT, RxNorm, LOINC, ICD-11).
+//! - [`operator::Evidence`] is a typed struct carrying [`Observation`]s and a
+//!   [`Provenance`] carrier (DEF-PS-12, DEF-PS-13).
+//! - [`Provenance`] is a typed carrier with origin, timestamp, operator version,
+//!   metadata, and optional `derives_from` hashes (DEF-MP-14, OBL-PS-04).
+//! - [`sofa::SofaRespOperator`] enforces the version-respecting derivation chain
+//!   invariant (INV-PS-05) by abstaining on version mismatch rather than
+//!   silently producing refined output.
+//!
+//! Deferred to later phases of the v0.2.0 cut:
+//!
+//! - Galois connection α_PS / γ_PS (Phase 3).
+//! - `OperatorSet` formalization (Phase 4).
+//! - KDIGO AKI, Wells/PE, CURB-65 operators (Phase 5).
+//! - SOFA-respiratory property-test tier upgrade (Phase 6).
 //!
 //! ## References
 //!

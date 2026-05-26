@@ -2,8 +2,8 @@
 
 A Rust substrate for symbolic clinical decision-making based on refinable hypothesis lattices and sound deduction operators.
 
-**Version:** 0.1.0
-**Status:** Early implementation (kernel milestone)
+**Version:** 0.2.0-alpha.0
+**Status:** M1 milestone in progress (Patient substrate completion; Phases 0–2 of 7 shipped)
 
 ## Overview
 
@@ -20,70 +20,97 @@ This implements the **patient-state substrate** from [Substrate-First Clinical A
 ### Creating a Hypothesis
 
 ```rust
-use clinlat::Hyp;
+use clinlat::{Atom, Hyp, OntologySystem};
 
 // The top element (most general hypothesis).
 let unknown = Hyp::unknown();
 
-// A specific hypothesis (in v0.1.0, atoms are static strings).
-let diagnosis = Hyp::new(vec!["sepsis_3", "respiratory_dysfunction"]);
+// A specific hypothesis. Atoms are resolved through ontology adapters
+// (SNOMED CT, RxNorm, LOINC, ICD-11); see `clinlat::ontology`.
+let hypoxemia = Atom {
+    system: OntologySystem::SNOMED,
+    code: "67822003".to_string(),
+    preferred_term: "Hypoxemia".to_string(),
+    version: "2026-01-31".to_string(),
+};
+let diagnosis = Hyp::new(vec![hypoxemia]);
 ```
 
 ### Refinement Ordering
 
 ```rust
-use clinlat::Hyp;
+use clinlat::{Atom, Hyp, OntologySystem};
 use std::cmp::Ordering;
 
 let unknown = Hyp::unknown();
-let specific = Hyp::new(vec!["sofa_score_3"]);
+let specific = Hyp::new(vec![Atom {
+    system: OntologySystem::SNOMED,
+    code: "clinlat-sofa-resp-3".to_string(),
+    preferred_term: "SOFA respiratory score 3".to_string(),
+    version: "0.2.0".to_string(),
+}]);
 
 // `specific` refines (is more specific than) `unknown`.
 assert_eq!(specific.partial_cmp(&unknown), Some(Ordering::Less));
 ```
 
-### Compatibility and Meet
+### Evidence with Provenance
 
 ```rust
-use clinlat::Hyp;
+use std::collections::BTreeMap;
+use chrono::Utc;
+use clinlat::{Evidence, Observation, Provenance, ProvenanceOrigin, Ver};
 
-let h1 = Hyp::new(vec!["diagnosis_a"]);
-let h2 = Hyp::new(vec!["diagnosis_b"]);
-let unknown = Hyp::unknown();
+let observations = vec![
+    Observation::new("LOINC:2703-7", serde_json::json!(98.0))
+        .with_unit("mmHg")
+        .with_source("Epic LIS"),  // PaO₂
+    Observation::new("LOINC:3150-0", serde_json::json!(1.0))
+        .with_source("Epic LIS"),  // FiO₂
+];
 
-// h1 and h2 are incompatible (orthogonal diagnoses).
-assert!(!h1.compat(&h2));
+let provenance = Provenance::new(
+    ProvenanceOrigin::new("external_lab_api", "LOINC", "2703-7"),
+    Utc::now(),
+    Ver::new("clinlat", "lab_ingest", "0.1.0"),
+    BTreeMap::new(),
+);
 
-// Any hypothesis is compatible with unknown.
-assert!(h1.compat(&unknown));
-
-// Meet of h1 and unknown is h1 itself.
-assert_eq!(h1.meet(&unknown), Some(h1.clone()));
-
-// Meet of incomparable hypotheses is None.
-assert_eq!(h1.meet(&h2), None);
+let evidence = Evidence::new(observations, provenance);
 ```
 
-### SOFA-3 Respiratory Scoring
+### SOFA-3 Respiratory Operator
 
 ```rust
-use clinlat::sofa::{SofaRespEvidence, score_from_ratio};
+use clinlat::{Hyp, Operator, Outcome, SofaRespOperator};
+# use std::collections::BTreeMap;
+# use chrono::Utc;
+# use clinlat::{Evidence, Observation, Provenance, ProvenanceOrigin, Ver};
+# let evidence = Evidence::new(
+#     vec![
+#         Observation::new("LOINC:2703-7", serde_json::json!(350.0)).with_unit("mmHg"),
+#         Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+#     ],
+#     Provenance::new(
+#         ProvenanceOrigin::new("external_lab_api", "LOINC", "2703-7"),
+#         Utc::now(),
+#         Ver::new("clinlat", "lab_ingest", "0.1.0"),
+#         BTreeMap::new(),
+#     ),
+# );
 
-// Evidence: PaO₂ = 350 mmHg, FiO₂ = 1.0, not on ventilator.
-let evidence = SofaRespEvidence::new(350.0, 1.0, false);
-let ratio = evidence.pao2_fio2_ratio().unwrap();  // 350.0
+let operator = SofaRespOperator::default_v0_2();
+let outcome = operator.apply(&Hyp::unknown(), &evidence);
 
-// Map to SOFA score (300–399 → score 1).
-let score = score_from_ratio(ratio, false);
-assert_eq!(score, Some(1));
-
-// If score ≥3, mechanical ventilation is required.
-let severe = score_from_ratio(80.0, false);  // <100 → score 4
-assert_eq!(severe, None);  // Precondition unmet (not ventilated).
-
-let severe_ventilated = score_from_ratio(80.0, true);
-assert_eq!(severe_ventilated, Some(4));
+match outcome {
+    Outcome::Refined(h) => println!("Refined to: {:?}", h),
+    Outcome::Abstain(reason) => println!("Abstained: {:?}", reason),
+}
 ```
+
+Lower-level `score_from_ratio(ratio, on_mech_vent) -> Option<u8>` is also exposed
+as a standalone numeric helper (no Evidence/Provenance plumbing) for callers that
+just need the SOFA mapping in isolation.
 
 ## Architecture
 
@@ -140,12 +167,24 @@ Each operator carries a soundness argument establishing three properties:
 
 See [`clinlat/docs/operators/sofa_resp_soundness.md`](docs/operators/sofa_resp_soundness.md) for the SOFA-3 argument.
 
-## v0.1.0 Simplifications
+## v0.2.0-alpha Status
 
-- **AtomId**: Static string reference (`&'static str`). Real ontology binding (SNOMED CT, RxNorm, LOINC, ICD-11) deferred to v0.2.
-- **Evidence**: Unit type in the trait interface. Structured evidence (lab values, timestamps, provenance) deferred to v0.2.
-- **Operator trait**: Generic interface; actual operators (like SOFA-3) use concrete evidence types.
-- **Provenance**: Unit stub `()`; real lineage and timestamping deferred to v0.2.
+What has shipped in this pre-release:
+
+- **`Atom`** (Phase 1): replaces `&'static str` AtomId with `{ system, code, preferred_term, version }`. Resolved through four `OntologyAdapter` implementations: SNOMED CT, RxNorm, LOINC, ICD-11.
+- **`Evidence`** (Phase 2): typed `{ observations: Vec<Observation>, provenance: Provenance }` carrying clinical observations and audit-trail provenance (DEF-PS-12, DEF-PS-13).
+- **`Provenance`** (Phase 2): typed carrier with origin, ISO 8601 timestamp, operator version, metadata, and optional `derives_from` hashes (DEF-MP-14, OBL-PS-04). JSON serializable with optional gzip compression.
+- **`SofaRespOperator`** (Phase 2): full `Operator::apply()` implementation with version-respecting derivation chain enforcement — the operator abstains rather than silently process evidence whose provenance version does not match (INV-PS-05).
+
+What remains for the v0.2.0 release (Phases 3–7 of Plans.md):
+
+- **Galois connection** α_PS / γ_PS property-tested per OBL-PS-02 (Phase 3).
+- **`OperatorSet`** type and composition formalized per DEF-PS-09 / OBL-PS-03 (Phase 4).
+- **Three additional operators**: KDIGO AKI, Wells/PE, CURB-65 (Phase 5).
+- **SOFA-respiratory upgrade** from informal-argument tier to property-test tier (Phase 6).
+- **Release prep**: README/SPEC cross-references, full CI green, publish dry-run (Phase 7).
+
+Pre-release versioning (`0.2.0-alpha.N`) is used while these phases land; the suffix is dropped on the cut to `0.2.0`.
 
 ## References
 
