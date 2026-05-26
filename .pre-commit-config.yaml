@@ -57,6 +57,14 @@ repos:
         types: [rust]
         stages: [commit]
         files: ^clinlat/
+      - id: cargo-doc
+        name: Cargo doc
+        entry: bash -c "cd clinlat && RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features --document-private-items"
+        language: system
+        pass_filenames: false
+        types: [rust]
+        stages: [commit]
+        files: ^clinlat/
 
 # Configuration per file type
 exclude: |

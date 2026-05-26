@@ -123,7 +123,7 @@ impl SofaRespOperator {
     /// Extract PaO₂ and FiO₂ values from observations.
     ///
     /// Looks for observations with codes matching LOINC PaO₂ (2703-7) and FiO₂ (3150-0).
-    /// Returns (Option<pao2>, Option<fio2>, on_mech_vent).
+    /// Returns `(Option<pao2>, Option<fio2>, on_mech_vent)`.
     fn extract_pao2_fio2(evidence: &crate::operator::Evidence) -> (Option<f64>, Option<f64>, bool) {
         let mut pao2 = None;
         let mut fio2 = None;
