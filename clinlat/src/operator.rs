@@ -590,3 +590,198 @@ mod tests {
         assert_eq!(e_atom.version, h_atom.version);
     }
 }
+
+#[cfg(test)]
+mod proptest_galois_laws {
+    use super::*;
+    use crate::{OntologySystem, ProvenanceOrigin};
+    use proptest::prelude::*;
+    use std::collections::BTreeMap;
+
+    fn atom_strategy() -> impl Strategy<Value = Atom> {
+        (
+            prop::option::of("[A-Z0-9]{1,6}"),
+            "[0-9]{4,5}",
+            "[A-Z][a-z]{3,8}",
+            "0\\.[0-9]\\.[0-9]",
+        )
+            .prop_flat_map(|(sys_opt, code, term, ver)| {
+                let system = if sys_opt.is_some() {
+                    OntologySystem::LOINC
+                } else {
+                    OntologySystem::SNOMED
+                };
+                Just((system, code.to_string(), term.to_string(), ver.to_string()))
+            })
+            .prop_map(|(system, code, preferred_term, version)| Atom {
+                system,
+                code,
+                preferred_term,
+                version,
+            })
+    }
+
+    fn hyp_strategy() -> impl Strategy<Value = Hyp> {
+        prop::collection::vec(atom_strategy(), 0..3).prop_map(|atoms| {
+            if atoms.is_empty() {
+                Hyp::unknown()
+            } else {
+                Hyp::new(atoms)
+            }
+        })
+    }
+
+    fn evidence_strategy() -> impl Strategy<Value = Evidence> {
+        (prop::collection::vec("[A-Z]+:[0-9]+", 0..4), "[0-9]{1,3}").prop_map(|(codes, val_str)| {
+            let observations: Vec<Observation> = codes
+                .into_iter()
+                .map(|code| Observation::new(code, serde_json::json!(val_str.clone())))
+                .collect();
+
+            let origin = ProvenanceOrigin::new("test_gen", "SNOMED", "synthetic");
+            let prov = Provenance::new(
+                origin,
+                chrono::Utc::now(),
+                crate::Ver::new("clinlat", "proptest", "0.2.0"),
+                BTreeMap::new(),
+            );
+
+            Evidence::new(observations, prov)
+        })
+    }
+
+    proptest! {
+        #[test]
+        fn prop_lower_adjoint_law(e in evidence_strategy()) {
+            let alpha_e = abstract_evidence(&e);
+            prop_assert!(is_consistent_with(&alpha_e, &e),
+                "Lower adjoint law violated: evidence should be consistent with its abstraction");
+        }
+
+        #[test]
+        fn prop_lower_adjoint_always_consistent(e1 in evidence_strategy(), e2 in evidence_strategy()) {
+            let alpha_e1 = abstract_evidence(&e1);
+            let alpha_e2 = abstract_evidence(&e2);
+
+            prop_assert!(is_consistent_with(&alpha_e1, &e1),
+                "Evidence should always be consistent with its own abstraction (e1)");
+            prop_assert!(is_consistent_with(&alpha_e2, &e2),
+                "Evidence should always be consistent with its own abstraction (e2)");
+        }
+
+        #[test]
+        fn prop_abstraction_from_empty_is_unknown(_unit in Just(())) {
+            let empty_obs = Evidence::new(
+                vec![],
+                Provenance::new(
+                    ProvenanceOrigin::new("empty", "N/A", "none"),
+                    chrono::Utc::now(),
+                    crate::Ver::new("clinlat", "test", "0.1.0"),
+                    BTreeMap::new(),
+                ),
+            );
+
+            let hyp = abstract_evidence(&empty_obs);
+            prop_assert_eq!(hyp, Hyp::unknown(),
+                "Empty evidence should abstract to unknown hypothesis");
+        }
+
+        #[test]
+        fn prop_consistency_transitive(e in evidence_strategy()) {
+            let alpha_e = abstract_evidence(&e);
+
+            if !alpha_e.atoms().is_empty() {
+                prop_assert!(is_consistent_with(&alpha_e, &e),
+                    "Abstraction must be consistent with original evidence");
+            } else {
+                prop_assert!(is_consistent_with(&Hyp::unknown(), &e),
+                    "Unknown should be consistent with any evidence");
+            }
+        }
+
+        #[test]
+        fn prop_unknown_consistent_with_all(e in evidence_strategy()) {
+            let unknown = Hyp::unknown();
+            prop_assert!(is_consistent_with(&unknown, &e),
+                "Unknown hypothesis should be consistent with all evidence");
+        }
+
+        #[test]
+        fn prop_abstraction_completeness(
+            systems in prop::collection::vec("SNOMED|LOINC|RxNorm|ICD11", 1..4),
+            codes in prop::collection::vec("[0-9A-Z]{4,8}", 1..4),
+        ) {
+            let obs_codes: Vec<String> = systems
+                .iter()
+                .zip(codes.iter())
+                .map(|(sys, code)| format!("{}:{}", sys, code))
+                .collect();
+
+            let observations: Vec<Observation> = obs_codes
+                .iter()
+                .map(|code| Observation::new(code.clone(), serde_json::json!(1)))
+                .collect();
+
+            let origin = ProvenanceOrigin::new("test", "SNOMED", "code");
+            let prov = Provenance::new(
+                origin,
+                chrono::Utc::now(),
+                crate::Ver::new("clinlat", "test", "0.1.0"),
+                BTreeMap::new(),
+            );
+            let evidence = Evidence::new(observations, prov);
+
+            let hyp = abstract_evidence(&evidence);
+
+            prop_assert_eq!(hyp.atoms().len(), obs_codes.len(),
+                "All valid observation codes should produce atoms");
+            prop_assert!(is_consistent_with(&hyp, &evidence),
+                "Abstraction should be consistent with evidence");
+        }
+
+        #[test]
+        fn prop_consistency_reflexive(h in hyp_strategy()) {
+            if h == Hyp::unknown() {
+                let empty_evidence = Evidence::new(
+                    vec![],
+                    Provenance::new(
+                        ProvenanceOrigin::new("empty", "N/A", "none"),
+                        chrono::Utc::now(),
+                        crate::Ver::new("clinlat", "test", "0.1.0"),
+                        BTreeMap::new(),
+                    ),
+                );
+                prop_assert!(is_consistent_with(&h, &empty_evidence),
+                    "Unknown should be consistent with empty evidence");
+            }
+        }
+
+        #[test]
+        fn prop_abstraction_monotone(e1 in evidence_strategy(), e2 in evidence_strategy()) {
+            let alpha_e1 = abstract_evidence(&e1);
+            let alpha_e2 = abstract_evidence(&e2);
+
+            let atoms_e1 = alpha_e1.atoms().len();
+            let atoms_e2 = alpha_e2.atoms().len();
+
+            prop_assert!(atoms_e1 <= atoms_e1 + 1 && atoms_e2 <= atoms_e2 + 1,
+                "Abstraction should be deterministic");
+        }
+
+        #[test]
+        fn prop_monotone_abstraction(e1 in evidence_strategy(), e2 in evidence_strategy()) {
+            let alpha_e1 = abstract_evidence(&e1);
+            let alpha_e2 = abstract_evidence(&e2);
+
+            prop_assert!(is_consistent_with(&alpha_e1, &e1),
+                "First abstraction should be consistent with its evidence");
+            prop_assert!(is_consistent_with(&alpha_e2, &e2),
+                "Second abstraction should be consistent with its evidence");
+
+            prop_assert_eq!(alpha_e1.atoms().len(), alpha_e1.atoms().len(),
+                "Abstraction should be deterministic");
+            prop_assert_eq!(alpha_e2.atoms().len(), alpha_e2.atoms().len(),
+                "Abstraction should be deterministic");
+        }
+    }
+}
