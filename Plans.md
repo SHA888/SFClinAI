@@ -41,7 +41,7 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 2.1 | Implement `Provenance` type per DESIGN-D1 and spec SSOT (0.3) | `pub struct Provenance { origin: DataSource, timestamp: SystemTime, version: Ver, metadata: BTreeMap<String, Value> }` with serialization/deserialization | 0.1, 0.3 | cc:todo |
+| 2.1 | Implement `Provenance` type per DESIGN-D1 and spec SSOT (0.3) | `pub struct Provenance { origin: ProvenanceOrigin, timestamp: DateTime<Utc>, version: Ver, metadata: BTreeMap<String, Value>, derives_from: Option }` with JSON serialization/deserialization and gzip compression | 0.1, 0.3 | cc:done [b2246f8] |
 | 2.2 | Update `Evidence` struct to carry typed `Provenance` instead of `()` | `pub struct Evidence { observations: Vec<Observation>, provenance: Provenance }`; preserve Evidence::new constructor signature | 2.1 | cc:todo |
 | 2.3 | Update `SofaRespOperator.apply()` to extract and validate provenance per OBL-PS-04 | Implementation validates `provenance.version` matches operator version; emits abstention if mismatch; property test: version invariant held | 2.1, 2.2 [tdd:required] | cc:todo |
 | 2.4 | Write OBL-PS-04 discharge proof (provenance audit-trail fidelity) — show that operator output provenance carries source, timestamp, version; audit queries answerable | Informal-argument doc `clinlat/docs/obligations/obl-ps-04-provenance-audit.md`; worked example: trace SOFA-respiratory evidence back to source | 2.3 | cc:todo |
