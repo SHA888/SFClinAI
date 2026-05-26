@@ -61,13 +61,11 @@
 //! assert_eq!(score, Some(1));
 //! ```
 //!
-//! ## v0.1.0 Simplifications
+//! ## v0.2.0 Deferrals
 //!
-//! - [`AtomId`] is `&'static str`; real ontology binding (SNOMED CT, RxNorm, LOINC, ICD-11)
-//!   is deferred to v0.2.
 //! - [`operator::Evidence`] is a unit type in the generic trait; concrete operators
 //!   (like [`sofa::SofaRespOperator`]) define richer evidence types.
-//! - Provenance is unit `()`; timestamped lineage is deferred to v0.2.
+//! - Provenance is unit `()`; timestamped lineage is deferred to v0.3.
 //!
 //! ## References
 //!
