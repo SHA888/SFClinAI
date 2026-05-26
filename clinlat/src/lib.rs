@@ -104,7 +104,7 @@ pub use ontology::{
     Atom, CacheMode, Icd11Adapter, LoincAdapter, OntologyAdapter, OntologyError, OntologySystem,
     RxNormAdapter, SNOMEDAdapter,
 };
-pub use operator::{Evidence, Observation, Operator, abstract_evidence};
+pub use operator::{Evidence, Observation, Operator, abstract_evidence, is_consistent_with};
 pub use outcome::Outcome;
 pub use provenance::{Provenance, ProvenanceOrigin};
 pub use sofa::{SofaRespEvidence, SofaRespHypothesis, SofaRespOperator};

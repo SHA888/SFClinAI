@@ -180,6 +180,71 @@ fn parse_observation_code(code: &str, prov: &Provenance) -> Option<Atom> {
     })
 }
 
+/// Check if evidence is consistent with a hypothesis.
+///
+/// Implements DEF-PS-06 (γ_PS: Hyp → Obs, predicate form).
+/// Checks if a given evidence packet is compatible with a hypothesis.
+///
+/// # Algorithm
+///
+/// Evidence e is consistent with hypothesis h iff:
+/// - For every atom in h, there exists a compatible atom in abstract_evidence(e)
+/// - Atoms are compatible if they have the same system, code, and version
+///   (per OntologyAdapter::validate_compatibility semantics).
+///
+/// This allows hypotheses created with different preferred_terms but the same
+/// semantic atoms (same system:code:version) to be recognized as consistent.
+///
+/// Formally (Galois adjunction, predicate form):
+/// ```text
+/// is_consistent_with(h, e) ⟺ ∀ atom_h ∈ h.atoms():
+///     ∃ atom_e ∈ abstract_evidence(e).atoms(): compatible(atom_h, atom_e)
+/// ```
+///
+/// # Example
+///
+/// ```
+/// # use clinlat::{Hyp, Atom, OntologySystem, Observation, Evidence, Provenance, ProvenanceOrigin};
+/// # use chrono::Utc;
+/// # use std::collections::BTreeMap;
+/// # use clinlat::operator::is_consistent_with;
+/// let atom = Atom {
+///     system: OntologySystem::LOINC,
+///     code: "2160-0".to_string(),
+///     preferred_term: "Glucose serum".to_string(),
+///     version: "0.1.0".to_string(),
+/// };
+/// let hyp = Hyp::new(vec![atom]);
+///
+/// let obs = Observation::new("LOINC:2160-0", serde_json::json!(98.0));
+/// let origin = ProvenanceOrigin::new("lab", "LOINC", "2160-0");
+/// let prov = Provenance::new(
+///     origin,
+///     Utc::now(),
+///     clinlat::Ver::new("clinlat", "test", "0.1.0"),
+///     BTreeMap::new(),
+/// );
+/// let evidence = Evidence::new(vec![obs], prov);
+///
+/// assert!(is_consistent_with(&hyp, &evidence));
+/// ```
+pub fn is_consistent_with(h: &Hyp, e: &Evidence) -> bool {
+    let e_abstracted = abstract_evidence(e);
+    let e_atoms = e_abstracted.atoms();
+
+    for h_atom in h.atoms() {
+        let found_compatible = e_atoms.iter().any(|e_atom| {
+            h_atom.system == e_atom.system
+                && h_atom.code == e_atom.code
+                && h_atom.version == e_atom.version
+        });
+        if !found_compatible {
+            return false;
+        }
+    }
+    true
+}
+
 /// A deduction operator: a function from hypothesis and evidence to a refined hypothesis or abstention.
 ///
 /// Operators are the primary mechanism for refining clinical hypotheses using deductive logic.
@@ -387,5 +452,141 @@ mod tests {
         assert!(!hyp.atoms().is_empty());
         let atom = &hyp.atoms()[0];
         assert_eq!(atom.version, "1.2.3");
+    }
+
+    #[test]
+    fn test_is_consistent_with_exact_match() {
+        let atom = Atom {
+            system: crate::OntologySystem::LOINC,
+            code: "2160-0".to_string(),
+            preferred_term: "Glucose (LOINC)".to_string(),
+            version: "0.1.0".to_string(),
+        };
+        let hyp = Hyp::new(vec![atom]);
+
+        let observations = vec![Observation::new("LOINC:2160-0", serde_json::json!(98.0))];
+        let prov = test_provenance();
+        let evidence = Evidence::new(observations, prov);
+
+        assert!(is_consistent_with(&hyp, &evidence));
+    }
+
+    #[test]
+    fn test_is_consistent_with_multiple_atoms_and_observations() {
+        let atom1 = Atom {
+            system: crate::OntologySystem::LOINC,
+            code: "2160-0".to_string(),
+            preferred_term: "Glucose (LOINC)".to_string(),
+            version: "0.1.0".to_string(),
+        };
+        let atom2 = Atom {
+            system: crate::OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia (SNOMED)".to_string(),
+            version: "0.1.0".to_string(),
+        };
+        let hyp = Hyp::new(vec![atom1, atom2]);
+
+        let observations = vec![
+            Observation::new("LOINC:2160-0", serde_json::json!(98.0)).with_unit("mg/dL"),
+            Observation::new("SNOMED:67822003", serde_json::json!(true)),
+        ];
+        let prov = test_provenance();
+        let evidence = Evidence::new(observations, prov);
+
+        assert!(is_consistent_with(&hyp, &evidence));
+    }
+
+    #[test]
+    fn test_is_consistent_with_unknown_hypothesis() {
+        let hyp = Hyp::unknown();
+        let observations = vec![Observation::new("LOINC:2160-0", serde_json::json!(98.0))];
+        let prov = test_provenance();
+        let evidence = Evidence::new(observations, prov);
+
+        assert!(is_consistent_with(&hyp, &evidence));
+    }
+
+    #[test]
+    fn test_is_consistent_with_mismatched_atoms() {
+        let atom = Atom {
+            system: crate::OntologySystem::LOINC,
+            code: "2160-0".to_string(),
+            preferred_term: "Glucose (LOINC)".to_string(),
+            version: "0.1.0".to_string(),
+        };
+        let hyp = Hyp::new(vec![atom]);
+
+        let observations = vec![Observation::new("SNOMED:67822003", serde_json::json!(true))];
+        let prov = test_provenance();
+        let evidence = Evidence::new(observations, prov);
+
+        assert!(!is_consistent_with(&hyp, &evidence));
+    }
+
+    #[test]
+    fn test_is_consistent_with_empty_evidence() {
+        let atom = Atom {
+            system: crate::OntologySystem::LOINC,
+            code: "2160-0".to_string(),
+            preferred_term: "Glucose (LOINC)".to_string(),
+            version: "0.1.0".to_string(),
+        };
+        let hyp = Hyp::new(vec![atom]);
+
+        let observations = vec![];
+        let prov = test_provenance();
+        let evidence = Evidence::new(observations, prov);
+
+        assert!(!is_consistent_with(&hyp, &evidence));
+    }
+
+    #[test]
+    fn test_is_consistent_with_evidence_subset() {
+        let atom = Atom {
+            system: crate::OntologySystem::LOINC,
+            code: "2160-0".to_string(),
+            preferred_term: "Glucose (LOINC)".to_string(),
+            version: "0.1.0".to_string(),
+        };
+        let hyp = Hyp::new(vec![atom]);
+
+        let observations = vec![
+            Observation::new("LOINC:2160-0", serde_json::json!(98.0)),
+            Observation::new("SNOMED:67822003", serde_json::json!(true)),
+        ];
+        let prov = test_provenance();
+        let evidence = Evidence::new(observations, prov);
+
+        assert!(is_consistent_with(&hyp, &evidence));
+    }
+
+    #[test]
+    fn test_is_consistent_with_galois_adjunction_property() {
+        let atom = Atom {
+            system: crate::OntologySystem::LOINC,
+            code: "2160-0".to_string(),
+            preferred_term: "Glucose (LOINC)".to_string(),
+            version: "0.1.0".to_string(),
+        };
+        let hyp = Hyp::new(vec![atom]);
+
+        let observations = vec![Observation::new("LOINC:2160-0", serde_json::json!(98.0))];
+        let prov = test_provenance();
+        let evidence = Evidence::new(observations, prov);
+
+        let e_abstracted = abstract_evidence(&evidence);
+
+        assert!(is_consistent_with(&hyp, &evidence));
+
+        assert_eq!(e_abstracted.atoms().len(), 1);
+        assert_eq!(hyp.atoms().len(), 1);
+
+        let e_atom = &e_abstracted.atoms()[0];
+        let h_atom = &hyp.atoms()[0];
+
+        assert_eq!(e_atom.system, h_atom.system);
+        assert_eq!(e_atom.code, h_atom.code);
+        assert_eq!(e_atom.version, h_atom.version);
     }
 }
