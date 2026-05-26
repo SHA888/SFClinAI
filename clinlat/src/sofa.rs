@@ -102,10 +102,12 @@ pub struct SofaRespOperator;
 
 impl Operator for SofaRespOperator {
     fn apply(&self, _h: &Hyp, _e: &crate::operator::Evidence) -> Outcome<Hyp, AbstainReason> {
-        // In v0.1.0, we work with a unit Evidence type. Real evidence will be passed in v0.2.
-        // For now, return an abstention indicating we need proper evidence structure.
+        // In v0.2.0, Evidence now carries typed observations and provenance.
+        // The actual SOFA respiratory logic (task 2.3) will extract PaO₂/FiO₂ from observations
+        // and refine the hypothesis accordingly.
+        // For now, return an abstention indicating we need the concrete operator implementation.
         Outcome::Abstain(AbstainReason::InsufficientEvidence(
-            "SOFA respiratory operator requires structured evidence (v0.2+)",
+            "SOFA respiratory operator implementation pending (task 2.3)",
         ))
     }
 }
