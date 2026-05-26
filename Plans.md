@@ -54,7 +54,7 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 3.1 | Define abstraction function `α_PS: Evidence → Hyp` | Signature `fn abstract_evidence(e: &Evidence) -> Hyp` mapping observed facts to patient hypotheses; doc anchors to DEF-PS-05 | 0.3 | cc:todo |
+| 3.1 | Define abstraction function `α_PS: Evidence → Hyp` | Signature `fn abstract_evidence(e: &Evidence) -> Hyp` mapping observed facts to patient hypotheses; doc anchors to DEF-PS-05 | 0.3 | cc:done [4a6cbd8] |
 | 3.2 | Define concretization function `γ_PS: Hyp → Set<Evidence>` | Signature `fn concretize_hypothesis(h: &Hyp) -> Set<Evidence>` (represented as predicate `fn is_consistent_with(&Hyp, &Evidence) -> bool`); doc anchors to DEF-PS-06 | 3.1 | cc:todo |
 | 3.3 | Implement adjunction property tests for α_PS and γ_PS | Property tests verify: (1) `e ∈ γ_PS(α_PS(e))` (lower adjoint), (2) `α_PS(γ_PS(h)) ⊑ h` (upper adjoint), (3) monotonicity; property test framework (proptest); ≥10 generated test cases | 3.1, 3.2 [tdd:required] | cc:todo |
 | 3.4 | Write OBL-PS-02 discharge proof (adjunction sound) — show that the adjoint laws hold unconditionally | Property-test tier doc `clinlat/docs/obligations/obl-ps-02-adjunction.md` with test suite output | 3.3 | cc:todo |
