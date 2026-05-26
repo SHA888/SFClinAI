@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{AbstainReason, Hyp, Outcome, Provenance};
+use crate::{AbstainReason, Atom, Hyp, OntologySystem, Outcome, Provenance};
 
 /// A single clinical observation (lab value, vital sign, finding, etc.).
 ///
@@ -92,6 +92,92 @@ impl Evidence {
     pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(json)
     }
+}
+
+/// Extract atoms from evidence observations and map to hypothesis.
+///
+/// Implements DEF-PS-05 and DEF-PS-06 (α_PS: Obs → Hyp).
+/// Maps a set of clinical observations to the most refined hypothesis they entail.
+///
+/// # Algorithm
+///
+/// 1. Parse each observation's code in "SYSTEM:CODE" format.
+/// 2. Resolve the code to an Atom with system, code, preferred_term, version.
+/// 3. Collect all atoms into a Hyp.
+///
+/// The resulting Hyp is the most refined hypothesis consistent with the observations:
+/// the greatest lower bound of atoms that the evidence entails.
+///
+/// # Behavior
+///
+/// - If `e.observations` is empty, returns `Hyp::unknown()` (top element, no information).
+/// - If all observations fail to parse, returns `Hyp::unknown()`.
+/// - Otherwise, returns a `Hyp` containing all successfully parsed atoms.
+///
+/// # Example
+///
+/// ```
+/// # use clinlat::{Observation, Evidence, Provenance, ProvenanceOrigin};
+/// # use chrono::Utc;
+/// # use std::collections::BTreeMap;
+/// # use clinlat::operator::abstract_evidence;
+/// let obs = Observation::new("LOINC:2160-0", serde_json::json!(98.0)).with_unit("mg/dL");
+/// let origin = ProvenanceOrigin::new("lab_system", "LOINC", "2160-0");
+/// let prov = Provenance::new(
+///     origin,
+///     Utc::now(),
+///     clinlat::Ver::new("clinlat", "lab_ingest", "0.1.0"),
+///     BTreeMap::new(),
+/// );
+/// let evidence = Evidence::new(vec![obs], prov);
+/// let hyp = abstract_evidence(&evidence);
+/// assert!(!hyp.atoms().is_empty());
+/// ```
+pub fn abstract_evidence(e: &Evidence) -> Hyp {
+    let mut atoms = Vec::new();
+
+    for obs in &e.observations {
+        if let Some(atom) = parse_observation_code(&obs.code, &e.provenance) {
+            atoms.push(atom);
+        }
+    }
+
+    if atoms.is_empty() {
+        Hyp::unknown()
+    } else {
+        Hyp::new(atoms)
+    }
+}
+
+/// Parse observation code "SYSTEM:CODE" into an Atom.
+///
+/// Extracts system and code from hyphen-separated format and derives
+/// version from provenance. Returns None if code format is invalid.
+fn parse_observation_code(code: &str, prov: &Provenance) -> Option<Atom> {
+    let parts: Vec<&str> = code.splitn(2, ':').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let system_str = parts[0];
+    let code_part = parts[1];
+
+    let system = match system_str {
+        "SNOMED" => OntologySystem::SNOMED,
+        "LOINC" => OntologySystem::LOINC,
+        "RxNorm" => OntologySystem::RxNorm,
+        "ICD11" => OntologySystem::ICD11,
+        _ => return None,
+    };
+
+    let version = prov.version.build.clone();
+
+    Some(Atom {
+        system,
+        code: code_part.to_string(),
+        preferred_term: format!("{} ({})", code_part, system_str),
+        version,
+    })
 }
 
 /// A deduction operator: a function from hypothesis and evidence to a refined hypothesis or abstention.
@@ -220,5 +306,86 @@ mod tests {
     fn test_observation_with_string_value() {
         let obs = Observation::new("CUSTOM:text_test", serde_json::json!("clinical finding"));
         assert_eq!(obs.value, serde_json::json!("clinical finding"));
+    }
+
+    #[test]
+    fn test_abstract_evidence_single_observation() {
+        let observations =
+            vec![Observation::new("LOINC:2160-0", serde_json::json!(98.0)).with_unit("mg/dL")];
+        let provenance = test_provenance();
+        let evidence = Evidence::new(observations, provenance);
+
+        let hyp = abstract_evidence(&evidence);
+
+        assert!(!hyp.atoms().is_empty());
+        assert_eq!(hyp.atoms().len(), 1);
+        let atom = &hyp.atoms()[0];
+        assert_eq!(atom.system, crate::OntologySystem::LOINC);
+        assert_eq!(atom.code, "2160-0");
+    }
+
+    #[test]
+    fn test_abstract_evidence_multiple_observations() {
+        let observations = vec![
+            Observation::new("LOINC:2160-0", serde_json::json!(98.0)).with_unit("mg/dL"),
+            Observation::new("SNOMED:67822003", serde_json::json!(true)),
+        ];
+        let provenance = test_provenance();
+        let evidence = Evidence::new(observations, provenance);
+
+        let hyp = abstract_evidence(&evidence);
+
+        assert_eq!(hyp.atoms().len(), 2);
+        let atom1 = &hyp.atoms()[0];
+        let atom2 = &hyp.atoms()[1];
+        assert_eq!(atom1.system, crate::OntologySystem::LOINC);
+        assert_eq!(atom2.system, crate::OntologySystem::SNOMED);
+    }
+
+    #[test]
+    fn test_abstract_evidence_empty_observations() {
+        let observations = vec![];
+        let provenance = test_provenance();
+        let evidence = Evidence::new(observations, provenance);
+
+        let hyp = abstract_evidence(&evidence);
+
+        assert_eq!(hyp.atoms().len(), 0);
+        assert!(hyp == Hyp::unknown());
+    }
+
+    #[test]
+    fn test_abstract_evidence_invalid_code_format() {
+        let observations = vec![
+            Observation::new("invalid_code", serde_json::json!(1)),
+            Observation::new("LOINC:2160-0", serde_json::json!(98.0)),
+        ];
+        let provenance = test_provenance();
+        let evidence = Evidence::new(observations, provenance);
+
+        let hyp = abstract_evidence(&evidence);
+
+        assert_eq!(hyp.atoms().len(), 1);
+        assert_eq!(hyp.atoms()[0].code, "2160-0");
+    }
+
+    #[test]
+    fn test_abstract_evidence_version_from_provenance() {
+        use crate::ProvenanceOrigin;
+        let observations = vec![Observation::new("SNOMED:67822003", serde_json::json!(true))];
+        let origin = ProvenanceOrigin::new("test_source", "SNOMED", "67822003");
+        let prov = Provenance::new(
+            origin,
+            Utc::now(),
+            crate::Ver::new("clinlat", "test_op", "1.2.3"),
+            BTreeMap::new(),
+        );
+        let evidence = Evidence::new(observations, prov);
+
+        let hyp = abstract_evidence(&evidence);
+
+        assert!(!hyp.atoms().is_empty());
+        let atom = &hyp.atoms()[0];
+        assert_eq!(atom.version, "1.2.3");
     }
 }
