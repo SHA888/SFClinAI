@@ -79,7 +79,9 @@ pub mod hyp;
 pub mod ontology;
 pub mod operator;
 pub mod outcome;
+pub mod provenance;
 pub mod sofa;
+pub mod version;
 
 pub use abstain::AbstainReason;
 pub use hyp::Hyp;
@@ -89,4 +91,6 @@ pub use ontology::{
 };
 pub use operator::Operator;
 pub use outcome::Outcome;
+pub use provenance::{Provenance, ProvenanceOrigin};
 pub use sofa::{SofaRespEvidence, SofaRespHypothesis, SofaRespOperator};
+pub use version::Ver;
