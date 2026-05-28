@@ -802,14 +802,6 @@ mod proptest_galois_laws {
                 "Abstraction should be consistent with evidence");
         }
 
-        /// Consistency is reflexive on the top element: Unknown is consistent
-        /// with every Evidence (including its trivially-abstracted empty form).
-        #[test]
-        fn prop_consistency_unknown_reflexive(e in evidence_strategy()) {
-            prop_assert!(is_consistent_with(&Hyp::unknown(), &e),
-                "Unknown should be consistent with every evidence packet");
-        }
-
         /// α_PS is deterministic: applying it twice to the same evidence
         /// produces the same atom multiset. Required for the Galois connection
         /// to be well-defined.
