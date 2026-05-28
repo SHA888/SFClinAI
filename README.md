@@ -20,7 +20,7 @@ Not a product, startup thesis, or published paper. The note is explicitly **a wo
 
 1. **`NOTE.md` §TL;DR through §3** — the problem, why scaling doesn't fix it, the principle stated plainly.
 2. **`ARCHITECTURE.md`** — five Mermaid diagrams. Read these _alongside_ §4 of the note.
-3. **`NOTE.md` §4** — the eighteen load-bearing principles (4A patient, 4B institutional, 4C interaction, 4D temporal).
+3. **`NOTE.md` §4** — the eighteen load-bearing principles (4A patient ×5, 4B institutional ×5, 4C interaction ×3, 4D temporal ×5).
 4. **`NOTE.md` §7E.1–7E.6** — six worked examples: Sepsis-3 prognostic stratification, KDIGO AKI staging, Wells/PE with sequential testing, CURB-65 disposition, chronic depression as an anti-example, and the live SSC 2021 → 2026 guideline transition through the substrate.
 5. **`NOTE.md` §6 and §8** — prior art, originality narrowing after substantial verification, and honest limitations.
 
