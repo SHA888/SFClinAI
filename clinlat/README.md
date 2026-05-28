@@ -3,7 +3,7 @@
 A Rust substrate for symbolic clinical decision-making based on refinable hypothesis lattices and sound deduction operators.
 
 **Version:** 0.2.0-alpha.0
-**Status:** M1 milestone in progress (Patient substrate completion; Phases 0–2 of 7 shipped)
+**Status:** M1 milestone in progress (Patient substrate completion; Phases 0–3 of 7 shipped)
 
 ## Overview
 
@@ -175,10 +175,10 @@ What has shipped in this pre-release:
 - **`Evidence`** (Phase 2): typed `{ observations: Vec<Observation>, provenance: Provenance }` carrying clinical observations and audit-trail provenance (DEF-PS-12, DEF-PS-13).
 - **`Provenance`** (Phase 2): typed carrier with origin, ISO 8601 timestamp, operator version, metadata, and optional `derives_from` hashes (DEF-MP-14, OBL-PS-04). JSON serializable with optional gzip compression.
 - **`SofaRespOperator`** (Phase 2): full `Operator::apply()` implementation with version-respecting derivation chain enforcement — the operator abstains rather than silently process evidence whose provenance version does not match (INV-PS-05).
+- **Galois connection** (Phase 3): abstraction `abstract_evidence` (α_PS) and the concretization predicate `is_consistent_with` (γ_PS) property-tested for the adjunction laws — `e ∈ γ_PS(α_PS(e))`, `α_PS(γ_PS(h)) ⊑ h`, and monotonicity — discharging OBL-PS-02 at the property-test tier. See [`docs/obligations/obl-ps-02-adjunction.md`](docs/obligations/obl-ps-02-adjunction.md). (A few post-review test-coverage cleanups, Plans.md tasks 3.5–3.7, remain before Phase 4.)
 
-What remains for the v0.2.0 release (Phases 3–7 of Plans.md):
+What remains for the v0.2.0 release (Phases 4–7 of Plans.md):
 
-- **Galois connection** α_PS / γ_PS property-tested per OBL-PS-02 (Phase 3).
 - **`OperatorSet`** type and composition formalized per DEF-PS-09 / OBL-PS-03 (Phase 4).
 - **Three additional operators**: KDIGO AKI, Wells/PE, CURB-65 (Phase 5).
 - **SOFA-respiratory upgrade** from informal-argument tier to property-test tier (Phase 6).

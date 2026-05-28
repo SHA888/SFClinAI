@@ -63,7 +63,7 @@
 //!
 //! ## v0.2.0-alpha Status
 //!
-//! Shipped (Phases 0–2 of the M1 milestone):
+//! Shipped (Phases 0–3 of the M1 milestone):
 //!
 //! - [`Atom`] replaces the v0.1.0 `&'static str` AtomId; resolved through four
 //!   [`OntologyAdapter`] implementations (SNOMED CT, RxNorm, LOINC, ICD-11).
@@ -74,10 +74,12 @@
 //! - [`sofa::SofaRespOperator`] enforces the version-respecting derivation chain
 //!   invariant (INV-PS-05) by abstaining on version mismatch rather than
 //!   silently producing refined output.
+//! - Galois connection: [`operator::abstract_evidence`] (α_PS) and
+//!   [`operator::is_consistent_with`] (the γ_PS predicate) are property-tested
+//!   for the adjunction laws, discharging OBL-PS-02.
 //!
 //! Deferred to later phases of the v0.2.0 cut:
 //!
-//! - Galois connection α_PS / γ_PS (Phase 3).
 //! - `OperatorSet` formalization (Phase 4).
 //! - KDIGO AKI, Wells/PE, CURB-65 operators (Phase 5).
 //! - SOFA-respiratory property-test tier upgrade (Phase 6).

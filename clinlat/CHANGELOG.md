@@ -11,9 +11,17 @@ Pre-1.0 minor bumps (`0.x.0`) carry breaking changes by SemVer convention.
 Tracking what is not yet on a published version. See `Plans.md` for the
 authoritative phase-by-phase task list.
 
+### Added (landed since `0.2.0-alpha.0`, not yet tagged)
+
+- Galois connection (Phase 3): `abstract_evidence` (α_PS) and the
+  `is_consistent_with` predicate (γ_PS), property-tested for the adjunction
+  laws — `e ∈ γ_PS(α_PS(e))`, `α_PS(γ_PS(h)) ⊑ h`, and monotonicity —
+  discharging OBL-PS-02 at the property-test tier. (DEF-PS-05 / DEF-PS-06)
+  See `docs/obligations/obl-ps-02-adjunction.md`. Post-review test-coverage
+  cleanups (Plans.md tasks 3.5–3.7) remain before Phase 4.
+
 ### Planned for `0.2.0` (M1 — Patient substrate completion)
 
-- Galois connection α_PS / γ_PS property-tested per OBL-PS-02 (Phase 3).
 - `OperatorSet` type and composition per DEF-PS-09 / OBL-PS-03 (Phase 4).
 - Three additional operators: KDIGO AKI, Wells/PE, CURB-65 (Phase 5).
 - SOFA-respiratory upgrade from informal-argument to property-test tier (Phase 6).

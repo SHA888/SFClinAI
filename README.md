@@ -2,7 +2,7 @@
 
 A position note arguing that clinical AI's safety properties must be enforced by a **symbolic substrate**, not by the behavior of learned components — with a coupled two-layer (patient + institutional) architecture, a temporal-evolution axis, six worked examples, and prior-art mapping.
 
-This repository holds the prose of that position, plus the **`clinlat` Rust kernel** (`v0.1.0`): a symbolic substrate for clinical hypothesis refinement with sound deduction operators.
+This repository holds the prose of that position, plus the **`clinlat` Rust kernel** (`v0.2.0-alpha.0`; `v0.1.0` on crates.io): a symbolic substrate for clinical hypothesis refinement with sound deduction operators, ontology-bounded atoms, and auditable provenance.
 
 ---
 
@@ -14,7 +14,7 @@ The architecture rests on eighteen load-bearing principles — five for the pati
 
 ## What it isn't
 
-Not a product, startup thesis, or published paper. The note is explicitly **a working draft for scrutiny, not for citation** (NOTE.md header). No code, no deployed system, no regulatory engagement. The work is a research program with a 2–4 year horizon for narrow applications and 5–8+ years for broader diagnostic reasoning (§7). Originality claims carry an explicit obsolescence window and are re-verified quarterly; the current assessment is valid through 2026-08-24 (NOTE.md header; §6 closing).
+Not a product, startup thesis, or published paper. The note is explicitly **a working draft for scrutiny, not for citation** (NOTE.md header). The `clinlat` kernel is an early research substrate — it discharges patient-substrate proof obligations in code, but it is not a clinical tool: no deployed system, no patient data, no regulatory engagement. The work is a research program with a 2–4 year horizon for narrow applications and 5–8+ years for broader diagnostic reasoning (§7). Originality claims carry an explicit obsolescence window and are re-verified quarterly; the current assessment is valid through 2026-08-24 (NOTE.md header; §6 closing).
 
 ## Quick start (read this order)
 
@@ -26,6 +26,8 @@ Not a product, startup thesis, or published paper. The note is explicitly **a wo
 
 Short on time: stopping after step 3 still holds the load-bearing claim.
 
+Formal-methods readers: **`SPEC.md`** sits between the note and the diagrams in the document stack (NOTE → SPEC → ARCHITECTURE). It carries the typed definitions, invariants, and proof obligations behind the eighteen principles, each annotated `[formalizes: NOTE.md §X.Y]`. The `clinlat` kernel is where the §2 patient-substrate obligations are discharged in code.
+
 ## Repository layout
 
 ```
@@ -33,7 +35,7 @@ SFClinAI/
 ├── NOTE.md             # Position note, v0.12.0-draft
 ├── ARCHITECTURE.md     # Five Mermaid diagrams, v0.2.0-draft
 ├── SPEC.md             # Engineering formalization, v0.3.0-draft
-├── clinlat/            # Rust substrate kernel, v0.1.0
+├── clinlat/            # Rust substrate kernel, v0.2.0-alpha.0
 │   ├── Cargo.toml
 │   ├── src/
 │   ├── README.md       # Kernel documentation
@@ -59,8 +61,9 @@ The composite is positioned as a route from UNDCS-class to CCS-class under the T
 ## Status and maturity
 
 - `NOTE.md`: **v0.12.0-draft**. Working draft for scrutiny. Not for citation.
+- `SPEC.md`: **v0.3.0-draft**. The formalization layer between the note and the diagrams: 57 named definitions (`DEF-*`), 23 invariants (`INV-*`), 17 proof obligations (`OBL-*`), 3 mathematical commitments (`MC-*`), and 12 open questions (`OQ-*`). Each definition is annotated `[formalizes: NOTE.md §X.Y]`, and §8 bidirectional traceability covers all eighteen principles with no known coverage gaps. The `clinlat` kernel discharges the §2 patient-substrate obligations in running code.
 - `ARCHITECTURE.md`: **v0.2.0-draft**. Re-anchored to `SPEC.md` v0.3.0-draft: principle-to-formalization map covering all eighteen principles with criticality tier (P/S/F) and SPEC.md DEF/INV/OBL anchors; Diagram 4 now renders the institutional symmetric re-review path (DEF-TE-06b) alongside the patient-side clinician-mediated path.
-- `clinlat`: **v0.1.0** (published to crates.io). Kernel implements patient-state substrate with `Hyp` poset, `Outcome<H,A>` result type, and SOFA-3 respiratory deduction operator. See [`clinlat/README.md`](clinlat/README.md) for quick start and [`clinlat/docs/operators/sofa_resp_soundness.md`](clinlat/docs/operators/sofa_resp_soundness.md) for soundness argument.
+- `clinlat`: **v0.2.0-alpha.0** (`v0.1.0` published to crates.io; the v0.2.0 milestone M1 — patient-substrate completion — is in progress). Patient-state substrate with `Hyp` refinement poset, `Outcome<H,A>` result type, and the SOFA-3 respiratory operator. Phases 0–3 of M1 have landed: an `Atom` type backed by four `OntologyAdapter` implementations (SNOMED CT, RxNorm, LOINC, ICD-11) replacing string atom IDs; a typed `Provenance` carrier with version-respecting derivation chains (OBL-PS-04); and the Galois connection α_PS / γ_PS property-tested for the adjunction laws (OBL-PS-02). Remaining for the v0.2.0 cut: `OperatorSet` composition (Phase 4); three further operators — KDIGO AKI, Wells/PE, CURB-65 (Phase 5); and the SOFA-respiratory property-test-tier upgrade (Phase 6). See [`clinlat/README.md`](clinlat/README.md) for quick start, [`clinlat/CHANGELOG.md`](clinlat/CHANGELOG.md) for version history, and [`clinlat/docs/operators/sofa_resp_soundness.md`](clinlat/docs/operators/sofa_resp_soundness.md) for the SOFA soundness argument.
 - No deployed system. No regulatory engagement.
 - Originality assessment timestamped 2026-05-24, valid through **2026-08-24** (quarterly re-verification cadence, per NOTE.md header and §6 closing).
 
