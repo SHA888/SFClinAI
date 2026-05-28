@@ -122,15 +122,34 @@ let hyp = Hyp::new(vec![
 
 ---
 
+## Refinement Order vs. Compatibility Semantics (v0.2.0-alpha.0 Note)
+
+**Important caveat (task 3.7, obs-3):** The document above discharges the **ontology closure** property (atoms are reachable from adapters). However, SPEC.md §2 defines a second property also called **INV-PS-01** — the **compatibility-under-refinement** invariant:
+
+If `h₁ ⊑_PS h₂` and `compat_PS(h₂, h₃)`, then `compat_PS(h₁, h₃)`.
+
+This second invariant **does not hold** in v0.2.0-alpha.0 due to a mismatch between:
+- The current `compat` definition: `compat(h, h') = (h == h') ∨ h.is_unknown() ∨ h'.is_unknown()`
+- The refined `PartialOrd` (atom-set inclusion): `h ⊑ h'` iff `h.atoms() ⊇ h'.atoms()`
+
+**Counterexample**: h₁ = {a, b}, h₂ = Unknown (empty), h₃ = {a, c}
+- `h₁ ⊑_PS h₂`: true ({a, b} ⊇ {})
+- `compat_PS(h₂, h₃)`: true (Unknown is compatible with all)
+- `compat_PS(h₁, h₃)`: false ({a, b} ≠ {a, c} and neither is Unknown)
+
+**Architectural decision (v0.2.0-alpha.0)**: This gap is documented as **OQ-PS-04** in SPEC.md §7.2 and deferred to v1.x. Phase 4 (operator-set formalization) does not depend on this invariant; it depends on operator soundness (OBL-PS-03), which is independent. Future versions with full ontology lattice structure will enable proper compatibility checking.
+
 ## Conclusion
 
-The invariant INV-PS-01 (ontology closure) is satisfied by construction:
+The invariant INV-PS-01 (**ontology closure**) is satisfied by construction:
 - Atoms are resolved via the OntologyAdapter trait.
 - Hypotheses are built from resolved atoms.
 - Operations on hypotheses preserve the invariant (Lemma 3).
 - The four concrete adapters (SNOMED, RxNorm, LOINC, ICD-11) guarantee reachability (Lemma 4).
 
 **Discharge**: ✓ Informal-argument tier (M1).
+
+**Note:** The distinct **INV-PS-01 (compatibility-under-refinement)** property does not hold in v0.2.0; see "Refinement Order vs. Compatibility Semantics" above.
 
 ---
 
