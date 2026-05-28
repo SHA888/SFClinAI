@@ -698,6 +698,46 @@ mod proptest_galois_laws {
             })
     }
 
+    /// Generate hand-crafted comparable hypothesis pairs (h_general, h_specific)
+    /// where h_general ⊑ h_specific by atom-set inclusion.
+    /// This strategy directly constructs hypotheses (not via abstraction) to test
+    /// antitone properties across the full lattice, not just α-derived elements.
+    fn comparable_hyp_pair() -> impl Strategy<Value = (Hyp, Hyp)> {
+        (
+            prop::collection::vec(atom_strategy(), 0..5), // atoms for general hyp
+            prop::collection::vec(atom_strategy(), 0..4), // extra atoms for specific hyp
+        )
+            .prop_map(|(general_atoms, extra_atoms)| {
+                let h_general = if general_atoms.is_empty() {
+                    Hyp::unknown()
+                } else {
+                    Hyp::new(general_atoms.clone())
+                };
+
+                let mut specific_atoms = general_atoms;
+                specific_atoms.extend(extra_atoms);
+                // Deduplicate by code to avoid redundant atoms
+                specific_atoms.sort_by(|a, b| a.code.cmp(&b.code));
+                specific_atoms.dedup_by(|a, b| a.code == b.code);
+
+                let h_specific = if specific_atoms.is_empty() {
+                    Hyp::unknown()
+                } else {
+                    Hyp::new(specific_atoms)
+                };
+
+                (h_general, h_specific)
+            })
+            .prop_filter("h_general ⊑ h_specific", |(h_general, h_specific)| {
+                // Verify h_general has fewer or equal atoms than h_specific
+                let g_codes: std::collections::HashSet<_> =
+                    h_general.atoms().iter().map(|a| &a.code).collect();
+                let s_codes: std::collections::HashSet<_> =
+                    h_specific.atoms().iter().map(|a| &a.code).collect();
+                g_codes.is_subset(&s_codes)
+            })
+    }
+
     proptest! {
         /// INV-MP-02 property 2: γ ∘ α is inflationary on Evidence.
         /// ∀ e. e ⊑_γ γ(α(e))  ⟺  is_consistent_with(α(e), e)
@@ -737,6 +777,9 @@ mod proptest_galois_laws {
         /// (h_specific has more atoms) and e is consistent with h_specific,
         /// then e is consistent with h_general. Equivalently, the set of
         /// evidence consistent with h shrinks monotonically as h is refined.
+        ///
+        /// This test covers the case where both hypotheses are derived from
+        /// evidence via the abstraction function α.
         #[test]
         fn prop_gamma_antitone_in_hyp(pair in monotone_evidence_pair()) {
             let (e_sub, e_full) = pair;
@@ -749,6 +792,28 @@ mod proptest_galois_laws {
             if is_consistent_with(&h_specific, &e_full) {
                 prop_assert!(is_consistent_with(&h_general, &e_full),
                     "γ antitonicity in h violated: e is consistent with h_specific but not h_general");
+            }
+        }
+
+        /// γ_PS antitonicity with hand-crafted hypothesis pairs.
+        /// Tests the antitone property on hypotheses constructed directly as
+        /// atom sets (not via abstraction), covering more of the lattice structure.
+        /// For arbitrary evidence, if e is consistent with h_specific, it must
+        /// be consistent with h_general (where h_general ⊑ h_specific).
+        ///
+        /// This strengthens obs-2 from the Phase 3 review by ensuring antitonicity
+        /// holds across all comparable hypothesis pairs, not just α-derived ones.
+        #[test]
+        fn prop_gamma_antitone_with_hand_crafted_hyps(
+            (h_general, h_specific) in comparable_hyp_pair(),
+            e in evidence_strategy(),
+        ) {
+            // h_general ⊑ h_specific by construction. Test antitonicity:
+            // if is_consistent_with(h_specific, e), then is_consistent_with(h_general, e).
+            if is_consistent_with(&h_specific, &e) {
+                prop_assert!(is_consistent_with(&h_general, &e),
+                    "γ antitonicity violated with hand-crafted hyps: e is consistent with h_specific but not h_general; h_general atoms: {:?}, h_specific atoms: {:?}",
+                    h_general.atoms(), h_specific.atoms());
             }
         }
 

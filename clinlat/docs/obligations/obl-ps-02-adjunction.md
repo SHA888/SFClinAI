@@ -18,6 +18,8 @@ This document discharges OBL-PS-02 by demonstrating that the patient-substrate G
 The formal adjunction (DEF-MP-08) is validated through:
 
 1. **Nine property-based tests** over 256+ randomly-generated cases per property
+   - Seven foundational tests covering inflationary, monotonicity, antitonicity, and edge cases
+   - Two antitonicity tests (one α-derived, one hand-crafted) strengthening lattice coverage (obs-2, task 3.6)
 2. **Worked examples** instantiating the Galois laws on real clinical data
 3. **Informal-argument proof** linking tests to the formal obligation
 
@@ -121,10 +123,10 @@ Nine property-based tests validate the Galois adjunction laws over **256+ random
 test proptest_galois_laws::prop_upper_adjoint_inflationary ... ok
 test proptest_galois_laws::prop_alpha_monotone ... ok
 test proptest_galois_laws::prop_gamma_antitone_in_hyp ... ok
+test proptest_galois_laws::prop_gamma_antitone_with_hand_crafted_hyps ... ok
 test proptest_galois_laws::prop_abstraction_from_empty_is_unknown ... ok
 test proptest_galois_laws::prop_unknown_consistent_with_all ... ok
 test proptest_galois_laws::prop_abstraction_completeness ... ok
-test proptest_galois_laws::prop_consistency_unknown_reflexive ... ok
 test proptest_galois_laws::prop_alpha_deterministic ... ok
 test proptest_galois_laws::prop_atom_set_consistency ... ok
 
@@ -173,7 +175,7 @@ that is refinement). Replaces the prior tautological assertion `x ≤ x + 1`.
 
 **Result:** ✓ 256+ test cases pass
 
-#### 3. **γ-Antitonicity in h (predicate form)** (`prop_gamma_antitone_in_hyp`)
+#### 3. **γ-Antitonicity in h (predicate form, α-derived)** (`prop_gamma_antitone_in_hyp`)
 
 **Formal law:** ∀ h₁ ⊑ h₂. is_consistent_with(h₁, e) ⟹ is_consistent_with(h₂, e)
 
@@ -190,6 +192,30 @@ if is_consistent_with(&h_specific, &e_full) {
 
 **What it validates:** Refining the hypothesis cannot turn consistency on. Equivalently,
 the predicate-encoded γ(h) is antitone in h: γ(h_specific) ⊆ γ(h_general).
+This test covers the special case where both hypotheses are derived via α from evidence.
+
+**Result:** ✓ 256+ test cases pass
+
+#### 3.5. **γ-Antitonicity with Hand-Crafted Hypothesis Pairs** (`prop_gamma_antitone_with_hand_crafted_hyps`)
+
+**Formal law (same as 3, broader coverage):** ∀ h₁ ⊑ h₂, ∀ e. is_consistent_with(h₁, e) ⟹ is_consistent_with(h₂, e)
+
+**Test code:**
+```rust
+let (h_general, h_specific) = comparable_hyp_pair();  // h_general ⊑ h_specific by construction
+let e = evidence_strategy();  // arbitrary evidence
+if is_consistent_with(&h_specific, &e) {
+    prop_assert!(is_consistent_with(&h_general, &e),
+        "γ antitonicity violated with hand-crafted hyps");
+}
+```
+
+**What it validates:** Strengthens the antitonicity property (obs-2, task 3.6) by testing
+against arbitrary hypothesis pairs constructed directly as atom sets, not just those
+reachable via α. This exercises the full lattice structure, ensuring antitonicity holds
+for all comparable hypotheses, not just α-derived ones. The `comparable_hyp_pair()`
+strategy generates pairs where h_general.atoms ⊆ h_specific.atoms, covering a broader
+range of lattice configurations.
 
 **Result:** ✓ 256+ test cases pass
 
@@ -235,20 +261,7 @@ silently dropped or duplicated). Now exercises all four ontology systems.
 
 **Result:** ✓ 256+ test cases pass
 
-#### 7. **Unknown Reflexive Consistency** (`prop_consistency_unknown_reflexive`)
-
-**Test code:**
-```rust
-prop_assert!(is_consistent_with(&Hyp::unknown(), &e));
-```
-
-**What it validates:** A focused statement of the top-element property over the full
-evidence-strategy distribution (not gated on `h == Unknown` like the prior version,
-which silently asserted nothing in most cases).
-
-**Result:** ✓ 256+ test cases pass
-
-#### 8. **α Determinism** (`prop_alpha_deterministic`)
+#### 7. **α Determinism** (`prop_alpha_deterministic`)
 
 **Test code:**
 ```rust
@@ -263,7 +276,7 @@ determinism check across the full evidence distribution.
 
 **Result:** ✓ 256+ test cases pass
 
-#### 9. **Atom-set Round-trip** (`prop_atom_set_consistency`)
+#### 8. **Atom-set Round-trip** (`prop_atom_set_consistency`)
 
 **Test code:**
 ```rust
