@@ -53,7 +53,7 @@ SFClinAI/
 ├── NOTE.md             # Position note (source of truth)
 ├── SPEC.md             # Formal definitions and proof obligations
 ├── ARCHITECTURE.md     # Visual diagrams (Mermaid)
-├── clinlat/            # Rust substrate kernel v0.1.0
+├── clinlat/            # Rust substrate kernel v0.2.0-alpha.0
 │   ├── Cargo.toml
 │   ├── src/
 │   └── README.md       # Kernel-specific documentation
@@ -75,7 +75,7 @@ Long-form critiques: Open a PR and tag it as a long-form critique.
 
 - **NOTE.md** (v0.12.0-draft): The position note and source of truth.
 - **SPEC.md** (v0.3.0-draft): Formalization layer with formal definitions and proof obligations.
-- **ARCHITECTURE.md** (v0.1.0-draft): Visual diagrams supporting comprehension.
+- **ARCHITECTURE.md** (v0.2.0-draft): Visual diagrams supporting comprehension.
 
 When revising, update all three documents to maintain consistency. See `CLAUDE.md` for detailed editing guidelines.
 
