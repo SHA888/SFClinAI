@@ -69,7 +69,7 @@ When proposing changes, please prioritize in this order:
 3. **Demonstrate the substrate-first framing fails** on a clinical decision not covered by the six worked examples (NOTE.md §7E.1–§7E.6).
 
 Short critiques: Open an issue.
-Long-form critiques: Submit a PR to the `critique/` branch.
+Long-form critiques: Open a PR and tag it as a long-form critique.
 
 ## Three-Document Stack
 

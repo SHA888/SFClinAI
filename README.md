@@ -83,7 +83,7 @@ The note exists to be argued with (§9). In order of preference:
 2. A demonstration that **one of the eighteen principles** in §4 is wrong or unnecessary — they are stated separately so they can be attacked separately.
 3. A demonstration that the **substrate-first framing fails** on a clinical decision the six worked examples (§7E.1–7E.6) did not cover.
 
-Issues for short critiques; PRs to `critique/` for long-form.
+Issues for short critiques; for long-form, open a PR and tag it as a long-form critique.
 
 ## License
 
