@@ -348,7 +348,7 @@ When operator version changes (e.g., SOFA-respiratory from v0.2.0 → v0.3.0), t
 - **SPEC.md §2.4:** Provenance definitions (DEF-MP-14, DEF-PS-12, DEF-PS-13)
 - **SPEC.md §5:** Temporal evolution (DEF-TE-07, INV-TE-04)
 - **SPEC.md §6.1:** Proof obligations (OBL-PS-04)
-- **DESIGN-D1-provenance.md:** Architectural decision on JSON encoding
+- **docs/design/DESIGN-D1-provenance.md:** Architectural decision on JSON encoding
 - **clinlat/docs/obligations/obl-ps-04-provenance-audit.md:** M1 discharge proof (informal-argument tier)
 
 ---
