@@ -122,8 +122,39 @@ mod tests {
     use super::*;
     use crate::provenance::{Provenance, ProvenanceOrigin};
     use crate::version::Ver;
+    use crate::{Atom, OntologySystem};
     use chrono::Utc;
     use std::collections::BTreeMap;
+
+    // Fixture operators for property testing
+
+    /// No-op operator: refines to identity (h' = h)
+    struct NoopOperatorFixture;
+    impl Operator for NoopOperatorFixture {
+        fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+            Outcome::Refined(_h.clone())
+        }
+    }
+
+    /// Constant refinement operator: adds a fixed atom to any hypothesis
+    struct ConstRefineOperatorFixture {
+        atom: Atom,
+    }
+    impl Operator for ConstRefineOperatorFixture {
+        fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+            let mut atoms = _h.atoms().to_vec();
+            atoms.push(self.atom.clone());
+            Outcome::Refined(Hyp::new(atoms))
+        }
+    }
+
+    /// Always-abstain operator: never refines
+    struct AlwaysAbstainOperatorFixture;
+    impl Operator for AlwaysAbstainOperatorFixture {
+        fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+            Outcome::Abstain(AbstainReason::InsufficientEvidence("fixture abstain"))
+        }
+    }
 
     fn test_evidence() -> Evidence {
         Evidence::new(
@@ -433,5 +464,178 @@ mod tests {
         assert_eq!(outcome.abstentions[0].0, "First");
         assert_eq!(outcome.abstentions[1].0, "Second");
         assert_eq!(outcome.abstentions[2].0, "Third");
+    }
+
+    #[test]
+    fn test_apply_set_monotonicity_const_refine() {
+        let atom = Atom {
+            system: OntologySystem::SNOMED,
+            code: "CONST-9999".to_string(),
+            preferred_term: "Test".to_string(),
+            version: "0.1.0".to_string(),
+        };
+
+        let set = OperatorSet::new().register(
+            Box::new(ConstRefineOperatorFixture { atom: atom.clone() }),
+            OperatorMetadata {
+                name: "ConstRefine".to_string(),
+                version: "v1.0.0".to_string(),
+            },
+        );
+
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert!(outcome.result <= h, "result should refine input");
+    }
+
+    #[test]
+    fn test_apply_set_abstention_propagates_forward() {
+        let atom = Atom {
+            system: OntologySystem::SNOMED,
+            code: "CONST-8888".to_string(),
+            preferred_term: "Test2".to_string(),
+            version: "0.1.0".to_string(),
+        };
+
+        let set = OperatorSet::new()
+            .register(
+                Box::new(AlwaysAbstainOperatorFixture),
+                OperatorMetadata {
+                    name: "Abstain".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(ConstRefineOperatorFixture { atom }),
+                OperatorMetadata {
+                    name: "ConstRefine".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            );
+
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert!(outcome.result <= h);
+        assert_eq!(outcome.abstentions.len(), 1);
+        assert_eq!(outcome.abstentions[0].0, "Abstain");
+    }
+
+    #[test]
+    fn test_apply_set_empty_set_identity() {
+        let set = OperatorSet::new();
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert_eq!(outcome.result, h);
+        assert!(outcome.abstentions.is_empty());
+    }
+
+    #[test]
+    fn test_apply_set_all_abstain_preserves_input() {
+        let set = OperatorSet::new()
+            .register(
+                Box::new(AlwaysAbstainOperatorFixture),
+                OperatorMetadata {
+                    name: "A1".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(AlwaysAbstainOperatorFixture),
+                OperatorMetadata {
+                    name: "A2".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(AlwaysAbstainOperatorFixture),
+                OperatorMetadata {
+                    name: "A3".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            );
+
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert_eq!(outcome.result, h);
+        assert_eq!(outcome.abstentions.len(), 3);
+    }
+
+    #[test]
+    fn test_apply_set_noop_chain_identity() {
+        let set = OperatorSet::new()
+            .register(
+                Box::new(NoopOperatorFixture),
+                OperatorMetadata {
+                    name: "N1".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(NoopOperatorFixture),
+                OperatorMetadata {
+                    name: "N2".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            );
+
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert_eq!(outcome.result, h);
+        assert!(outcome.abstentions.is_empty());
+    }
+
+    #[test]
+    fn test_apply_set_multiple_const_refine() {
+        let atom1 = Atom {
+            system: OntologySystem::SNOMED,
+            code: "CONST-7777".to_string(),
+            preferred_term: "T1".to_string(),
+            version: "0.1.0".to_string(),
+        };
+        let atom2 = Atom {
+            system: OntologySystem::SNOMED,
+            code: "CONST-6666".to_string(),
+            preferred_term: "T2".to_string(),
+            version: "0.1.0".to_string(),
+        };
+
+        let set = OperatorSet::new()
+            .register(
+                Box::new(ConstRefineOperatorFixture {
+                    atom: atom1.clone(),
+                }),
+                OperatorMetadata {
+                    name: "R1".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(ConstRefineOperatorFixture {
+                    atom: atom2.clone(),
+                }),
+                OperatorMetadata {
+                    name: "R2".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            );
+
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert!(outcome.result <= h);
+        let result_atoms = outcome.result.atoms();
+        assert!(result_atoms.contains(&atom1));
+        assert!(result_atoms.contains(&atom2));
     }
 }

@@ -610,7 +610,7 @@ mod proptest_galois_laws {
         prop_oneof![Just("SNOMED"), Just("LOINC"), Just("RxNorm"), Just("ICD11"),]
     }
 
-    fn atom_strategy() -> impl Strategy<Value = Atom> {
+    pub(crate) fn atom_strategy() -> impl Strategy<Value = Atom> {
         (
             system_strategy(),
             "[0-9]{4,5}",
@@ -625,7 +625,7 @@ mod proptest_galois_laws {
             })
     }
 
-    fn hyp_strategy() -> impl Strategy<Value = Hyp> {
+    pub(crate) fn hyp_strategy() -> impl Strategy<Value = Hyp> {
         prop::collection::vec(atom_strategy(), 0..3).prop_map(|atoms| {
             if atoms.is_empty() {
                 Hyp::unknown()
@@ -639,7 +639,7 @@ mod proptest_galois_laws {
         (system_token_strategy(), "[0-9]{3,5}").prop_map(|(sys, code)| format!("{}:{}", sys, code))
     }
 
-    fn evidence_strategy() -> impl Strategy<Value = Evidence> {
+    pub(crate) fn evidence_strategy() -> impl Strategy<Value = Evidence> {
         (
             prop::collection::vec(observation_code_strategy(), 0..4),
             "[0-9]{1,3}",
@@ -701,7 +701,7 @@ mod proptest_galois_laws {
     /// where h_general ⊑ h_specific by atom-set inclusion.
     /// This strategy directly constructs hypotheses (not via abstraction) to test
     /// antitone properties across the full lattice, not just α-derived elements.
-    fn comparable_hyp_pair() -> impl Strategy<Value = (Hyp, Hyp)> {
+    pub(crate) fn comparable_hyp_pair() -> impl Strategy<Value = (Hyp, Hyp)> {
         (
             prop::collection::vec(atom_strategy(), 0..5), // atoms for general hyp
             prop::collection::vec(atom_strategy(), 0..4), // extra atoms for specific hyp
