@@ -104,35 +104,11 @@
 
 ---
 
-## Phase 6-BF: Bugfix (M1.6-BF) — Implementation correctness
+## Phase 6-BF: Bugfix (archived to ARCHIVE-6BF.md)
 
-**Goal:** Fix 11 semantic bugs found in clinlat implementation review (2026-05-29). Prioritized by severity: 5 HIGH (blocking v0.2.0), 3 MEDIUM (v0.2.0–v0.3.0), 3 LOW (maintenance).
-
-### HIGH severity (blocking v0.2.0)
-
-| Task | Content | DoD | Depends | Status |
-|------|---------|-----|---------|--------|
-| 6b.1 | **Bug #1: Hyp::new allows duplicate atoms, breaking PartialOrd consistency** — Normalize atoms on construction. Deduplicate Vec and sort by (system, code) | `Hyp::new()` deduplicates and sorts atoms; `partial_cmp()` and `==` now agree on atom-set identity; all existing tests pass; new test: `test_hyp_duplicate_atoms_deduplicated` | 1.7 | cc:done [743e1d7] |
-| 6b.2 | **Bug #5: SofaRespOperator::apply ignores input hypothesis, violates monotonicity** — Operator must refine input (δ(h,e) ⊑ h per DEF-PS-08). Update apply() to chain refined_atoms = h.atoms() + sofa_atom; add assertion | `SofaRespOperator::apply()` appends sofa_atom to input h.atoms(); output Hyp satisfies output ⊑ input; test: `test_sofa_operator_monotonicity_preserved` verifies no 'backwards' refinement | 2.3 | cc:done [3c3b426] |
-| 6b.3 | **Bug #3 + #6: Version string drift — SofaRespOperator emits hard-coded "clinlat-v0.2.0" instead of self.version** — Refactor score_to_atom() from fn to &self method; use self.version in atoms. Align with is_consistent_with() version semantics | `score_to_atom(&self, ...)` uses self.version; evidence version check (is_consistent_with) now passes for operators with matching version; test: `test_sofa_version_consistency_across_operators` | 2.3 | cc:done [3c3b426] |
-| 6b.4 | **Bug #4: Atom identity mismatch — Hash/Eq includes preferred_term, but validation (validate_compatibility) excludes it** — Implement custom Hash/Eq that exclude preferred_term (or move it outside the identity). Update PartialOrd to use (system, code, version) for identity | Atom Hash/Eq exclude preferred_term; validate_compatibility semantics align; HashSet<&Atom> membership now matches intent; test: `test_atom_identity_consistent` | 1.6 | cc:done [79f2645] |
-| 6b.5 | **Bug #2: Hyp::compat violates INV-PS-01 (compatibility under refinement)** — Choose reconciliation from SPEC.md §7 open question (3.7 decision outcome). Implement compat_refined() or widen compat definition | SPEC.md §7 documents decision; compat (or compat_refined) impl satisfies INV-PS-01; property test: `prop_compat_closed_under_refinement` | 3.7 | cc:done [79f2645] |
-
-### MEDIUM severity (v0.2.0–v0.3.0)
-
-| Task | Content | DoD | Depends | Status |
-|------|---------|-----|---------|--------|
-| 6b.6 | **Bug #7: Wrong abstain variant — SofaRespOperator uses InsufficientEvidence for precondition failure** — Replace with OperatorPreconditionUnmet; update abstain handling to distinguish data absence from precondition inapplicability | Score ≥3 without mechanical ventilation returns OperatorPreconditionUnmet, not InsufficientEvidence; audit tooling can now distinguish; test: `test_sofa_precondition_unmet_variant` | 2.3 | cc:done [31411e7] |
-| 6b.7 | **Bug #8: Panic on zero cache — NonZeroUsize::new(cache_size).unwrap() panics in all four OntologyAdapter constructors** — Add bounds check; either panic early with descriptive message or use default (e.g., 1024) | Adapter constructors validate cache_size > 0; panic message is clear; test: `test_ontology_adapter_cache_size_validation` | 1.2, 1.3, 1.4, 1.5 | cc:done [31411e7] |
-| 6b.8 | **Bug #9: SOFA boundary off-by-one — Threshold 300.0 vs Sepsis-3 table unclear** — Verify exact boundary against Sepsis-3 table (Singer et al. 2016); add test case for exactly 300.0 and document rationale in comment | SOFA threshold 300.0 matches Sepsis-3 table; test: `test_sofa_boundary_exactly_300` verifies correct score | 6.1 | cc:done [31411e7] |
-
-### LOW severity (maintenance)
-
-| Task | Content | DoD | Depends | Status |
-|------|---------|-----|---------|--------|
-| 6b.9 | **Bug #10: Lock release in cache — concurrent cache misses cause redundant inserts** — Hold lock across get+put or use entry API; document rationale for chosen pattern | SNOMEDAdapter (and other adapters) hold lock across get and conditional put; comments explain why; redundant inserts now rare; test: `test_cache_concurrent_misses_idempotent` | 1.2, 1.3, 1.4, 1.5 | cc:done [a9aa92d] |
-| 6b.10 | **Bug #11: AbstainReason too simple — carries &'static str instead of structured payloads per SPEC.md DEF-PS-10** — Document as v0.1.0 simplification; add TODO or create v0.2.0+ card in backlog | AbstainReason documented with SPEC.md DEF-PS-10 reference; TODO comment added; SPEC.md §7 open question created if not already present | 1.1 | cc:done [a9aa92d] |
-| 6b.11 | **Property-test verification of all fixes** — Run full test suite; verify OBL-PS-02 adjunction, OBL-PS-03 operator composition, INV-PS-01 through INV-PS-06 | `cargo test --lib` passes all; property-test suite covers refined fixes; `cargo clippy` clean | 6b.1–6b.10 | cc:done [a9aa92d] |
+**Status:** All 11 bugs fixed and verified (2026-05-29)
+**Archive:** See `ARCHIVE-6BF.md` for detailed bugfix history and commits
+**Summary:** 5 HIGH (✅), 3 MEDIUM (✅), 3 LOW (✅) — 129 tests passing, all invariants satisfied
 
 ---
 
