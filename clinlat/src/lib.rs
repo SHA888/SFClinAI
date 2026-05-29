@@ -92,6 +92,7 @@
 //! - **SOFA-3**: Vincent et al. (1996), Singer et al. (2016, Sepsis-3).
 
 pub mod abstain;
+pub mod curb65;
 pub mod hyp;
 pub mod kdigo_aki;
 pub mod ontology;
@@ -104,6 +105,7 @@ pub mod version;
 pub mod wells_pe;
 
 pub use abstain::AbstainReason;
+pub use curb65::Curb65Operator;
 pub use hyp::Hyp;
 pub use kdigo_aki::KdigoAkiOperator;
 pub use ontology::{
