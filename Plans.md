@@ -70,10 +70,10 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 4.1 | Define `OperatorSet` type (Δ_PS) | `pub struct OperatorSet { operators: Vec<Box<dyn Operator>>, metadata: BTreeMap<String, OperatorMetadata> }` with DEF-PS-09 semantics | 1.7, 2.2, 3.7 | cc:todo |
-| 4.2 | Implement OperatorSet::apply_set() method | Method applies all registered operators in sequence, collects refined Hyp or first abstention; preserves refinement order from Phase 1 | 4.1 [tdd:required] | cc:todo |
-| 4.3 | Property-test OperatorSet soundness (OBL-PS-03 across the set) | Tests verify: (1) operator composition preserves refinement order, (2) no silent contradictions between operator outputs, (3) abstention from one doesn't silence another; ≥15 property cases | 4.2 [tdd:required] | cc:todo |
-| 4.4 | Write OBL-PS-03 discharge proof (operator-set soundness) — property-test tier | Doc `clinlat/docs/obligations/obl-ps-03-operator-set-sound.md` with test suite summary | 4.3 | cc:todo |
+| 4.1 | Define `OperatorSet` type (Δ_PS) | `pub struct OperatorSet { operators: Vec<Box<dyn Operator>>, metadata: BTreeMap<String, OperatorMetadata> }` with builder methods; 8 unit tests covering empty set, registration, apply_set with noop/abstain | 1.7, 2.2, 3.7 | cc:done [9793260] |
+| 4.2 | Implement OperatorSet::apply_set() method with propagate-forward semantics | Method applies all registered operators in sequence; abstentions recorded but don't silence next; SetOutcome carries result hypothesis and (name, reason) pairs; 3 additional unit tests for mixed chains | 4.1 [tdd:required] | cc:done [2066118] |
+| 4.3 | Property-test OperatorSet soundness (OBL-PS-03 across the set) | Three fixture operators (NoopOperator, ConstRefineOperator, AlwaysAbstainOperator); 6 property tests verify composition preserves refinement, abstention propagates forward, empty set identity, all-abstain preserves input, noop chains are identity, multi-operator chains refine | 4.2 [tdd:required] | cc:done [b3b5925] |
+| 4.4 | Write OBL-PS-03 discharge proof (operator-set soundness) — property-test tier | Doc `clinlat/docs/obligations/obl-ps-03-operator-set-sound.md` with lifting lemma proof (induction on chain length), implementation notes, 6 test discharges, worked example (Sofa+Kdigo composition), limitations, verification checklist | 4.3 | cc:done [f222ae1] |
 
 ---
 
