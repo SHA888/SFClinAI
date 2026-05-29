@@ -95,8 +95,13 @@ impl fmt::Display for OntologySystem {
 /// - **Auditability**: Each atom carries its ontology version, supporting regulatory traceability.
 /// - **Compatibility checking**: Two atoms are compatible iff they encode the same concept in the same version.
 ///
+/// **Identity semantics**: Atom identity is determined by (system, code, version) only.
+/// The preferred_term is a display label and does not affect equality or hashing.
+/// This ensures atoms with identical semantics but different term labels (e.g., "Hypoxemia" vs "Low blood oxygen")
+/// are treated as equal in HashSet/HashMap and by the `PartialOrd` refinement order.
+///
 /// [1]: https://github.com/SHA888/SFClinAI/blob/main/SPEC.md#22-atom-definition
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub struct Atom {
     /// Which ontology system this atom belongs to.
     pub system: OntologySystem,
@@ -110,6 +115,22 @@ pub struct Atom {
     /// Ontology version this atom was resolved from (e.g., "2026-01-31" for SNOMED CT Edition 2026-01-31).
     /// Version string format is system-specific; no semantic parsing is required.
     pub version: String,
+}
+
+impl PartialEq for Atom {
+    fn eq(&self, other: &Self) -> bool {
+        self.system == other.system && self.code == other.code && self.version == other.version
+    }
+}
+
+impl Eq for Atom {}
+
+impl std::hash::Hash for Atom {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.system.hash(state);
+        self.code.hash(state);
+        self.version.hash(state);
+    }
 }
 
 impl fmt::Display for Atom {
@@ -1233,5 +1254,40 @@ mod tests {
             version: "2024-11".to_string(),
         };
         assert!(adapter.validate_compatibility(&atom1, &atom2));
+    }
+
+    #[test]
+    fn test_atom_identity_excludes_preferred_term() {
+        // Two atoms with same semantic identity (system, code, version) but different
+        // preferred_term should be equal. This fixes bug #4: atom identity mismatch.
+        let atom_hypoxemia_label1 = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_hypoxemia_label2 = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Low blood oxygen level".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        // Same semantic identity
+        assert_eq!(atom_hypoxemia_label1, atom_hypoxemia_label2);
+
+        // HashSet membership should work correctly
+        let mut set = std::collections::HashSet::new();
+        set.insert(atom_hypoxemia_label1.clone());
+        assert!(set.contains(&atom_hypoxemia_label2));
+
+        // Different version or code should not be equal
+        let atom_different_version = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2025-01-31".to_string(),
+        };
+        assert_ne!(atom_hypoxemia_label1, atom_different_version);
     }
 }
