@@ -95,6 +95,7 @@ pub mod abstain;
 pub mod hyp;
 pub mod ontology;
 pub mod operator;
+pub mod operator_set;
 pub mod outcome;
 pub mod provenance;
 pub mod sofa;
@@ -107,6 +108,7 @@ pub use ontology::{
     RxNormAdapter, SNOMEDAdapter,
 };
 pub use operator::{Evidence, Observation, Operator, abstract_evidence, is_consistent_with};
+pub use operator_set::{OperatorMetadata, OperatorSet, SetOutcome};
 pub use outcome::Outcome;
 pub use provenance::{Provenance, ProvenanceOrigin};
 pub use sofa::{SofaRespEvidence, SofaRespHypothesis, SofaRespOperator};
