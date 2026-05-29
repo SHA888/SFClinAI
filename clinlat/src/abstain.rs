@@ -9,21 +9,35 @@
 ///
 /// Implements DEF-PS-10 (five abstention types).
 ///
-/// # v0.1.0 Simplification
+/// # v0.1.0 Simplification — TODO: Upgrade in v0.2.0+
 ///
-/// Each variant carries a `&'static str` message rather than structured detail.
-/// In v0.2.0+, variants will carry rich context (missing lab values, conflicting evidence, etc.).
+/// Each variant currently carries a `&'static str` message rather than structured detail.
+/// Per SPEC.md DEF-PS-10, variants should carry:
+/// - `InsufficientEvidence(missing: Set<RequiredObservation>)` — names which observations are missing
+/// - `OutOfDistribution(detail: OodReport)` — characterizes the OOD region (e.g., age range, lab bounds)
+/// - `AmbiguousRefinement(candidates: Set<Hyp>, rationale: Provenance)` — enumerates competing hypotheses
+/// - `OperatorPreconditionUnmet(operator: OperatorName, condition: PreconditionId)` — names the condition
+/// - `OntologyOutOfScope(atoms: Set<AtomId>)` — names the unknown atoms
+///
+/// This enables downstream audit tooling (e.g., logging, debugging, automated escalation) to
+/// machine-classify which observation or precondition is the blocker, rather than parsing
+/// unstructured text. See SPEC.md §7 / OQ-PS-10.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AbstainReason {
     /// Insufficient evidence to make a determination (e.g., missing lab values).
+    /// TODO (v0.2.0+): replace `&'static str` with `Set<RequiredObservation>` per DEF-PS-10.
     InsufficientEvidence(&'static str),
     /// Evidence is outside the operator's training distribution.
+    /// TODO (v0.2.0+): replace `&'static str` with `OodReport` per DEF-PS-10.
     OutOfDistribution(&'static str),
     /// Multiple equally valid refinements exist (ambiguity).
+    /// TODO (v0.2.0+): replace `&'static str` with `(Set<Hyp>, Provenance)` per DEF-PS-10.
     AmbiguousRefinement(&'static str),
     /// Operator precondition is unmet (e.g., required field missing).
+    /// TODO (v0.2.0+): replace `&'static str` with `(OperatorName, PreconditionId)` per DEF-PS-10.
     OperatorPreconditionUnmet(&'static str),
     /// Evidence or hypothesis refers to concepts outside the operator's ontology.
+    /// TODO (v0.2.0+): replace `&'static str` with `Set<AtomId>` per DEF-PS-10.
     OntologyOutOfScope(&'static str),
 }
 

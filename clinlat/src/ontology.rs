@@ -387,6 +387,11 @@ impl OntologyAdapter for SNOMEDAdapter {
         }
 
         // Fallback to offline snapshot
+        // Note: Lock is released between cache-miss and cache-update, allowing concurrent misses
+        // on the same code to both look up the snapshot. This creates rare redundant inserts, but:
+        // 1) LruCache::put is idempotent for equal values (safe)
+        // 2) Redundant inserts only evict other entries on subsequent misses, which is acceptable
+        // 3) Avoiding lock-held-across-await patterns improves async safety
         if let Some(atom) = self.snapshot.get(code).cloned() {
             // Update cache on hit
             let mut cache = self.cache.lock().await;
@@ -507,6 +512,11 @@ impl OntologyAdapter for RxNormAdapter {
         }
 
         // Fallback to offline snapshot
+        // Note: Lock is released between cache-miss and cache-update, allowing concurrent misses
+        // on the same code to both look up the snapshot. This creates rare redundant inserts, but:
+        // 1) LruCache::put is idempotent for equal values (safe)
+        // 2) Redundant inserts only evict other entries on subsequent misses, which is acceptable
+        // 3) Avoiding lock-held-across-await patterns improves async safety
         if let Some(atom) = self.snapshot.get(code).cloned() {
             // Update cache on hit
             let mut cache = self.cache.lock().await;
@@ -627,6 +637,11 @@ impl OntologyAdapter for LoincAdapter {
         }
 
         // Fallback to offline snapshot
+        // Note: Lock is released between cache-miss and cache-update, allowing concurrent misses
+        // on the same code to both look up the snapshot. This creates rare redundant inserts, but:
+        // 1) LruCache::put is idempotent for equal values (safe)
+        // 2) Redundant inserts only evict other entries on subsequent misses, which is acceptable
+        // 3) Avoiding lock-held-across-await patterns improves async safety
         if let Some(atom) = self.snapshot.get(code).cloned() {
             // Update cache on hit
             let mut cache = self.cache.lock().await;
@@ -747,6 +762,11 @@ impl OntologyAdapter for Icd11Adapter {
         }
 
         // Fallback to offline snapshot
+        // Note: Lock is released between cache-miss and cache-update, allowing concurrent misses
+        // on the same code to both look up the snapshot. This creates rare redundant inserts, but:
+        // 1) LruCache::put is idempotent for equal values (safe)
+        // 2) Redundant inserts only evict other entries on subsequent misses, which is acceptable
+        // 3) Avoiding lock-held-across-await patterns improves async safety
         if let Some(atom) = self.snapshot.get(code).cloned() {
             // Update cache on hit
             let mut cache = self.cache.lock().await;
