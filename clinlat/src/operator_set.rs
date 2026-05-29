@@ -311,4 +311,127 @@ mod tests {
         assert_eq!(set.len(), 0);
         assert!(set.is_empty());
     }
+
+    #[test]
+    fn test_apply_set_abstain_then_refine() {
+        struct AbstainOp;
+        impl Operator for AbstainOp {
+            fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+                Outcome::Abstain(AbstainReason::InsufficientEvidence("test"))
+            }
+        }
+
+        struct NoopOp;
+        impl Operator for NoopOp {
+            fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+                Outcome::Refined(_h.clone())
+            }
+        }
+
+        let set = OperatorSet::new()
+            .register(
+                Box::new(AbstainOp),
+                OperatorMetadata {
+                    name: "Abstain".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(NoopOp),
+                OperatorMetadata {
+                    name: "Noop".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            );
+
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert_eq!(outcome.result, h);
+        assert_eq!(outcome.abstentions.len(), 1);
+        assert_eq!(outcome.abstentions[0].0, "Abstain");
+    }
+
+    #[test]
+    fn test_apply_set_both_noop() {
+        struct NoopOp1;
+        impl Operator for NoopOp1 {
+            fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+                Outcome::Refined(_h.clone())
+            }
+        }
+
+        struct NoopOp2;
+        impl Operator for NoopOp2 {
+            fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+                Outcome::Refined(_h.clone())
+            }
+        }
+
+        let set = OperatorSet::new()
+            .register(
+                Box::new(NoopOp1),
+                OperatorMetadata {
+                    name: "Noop1".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(NoopOp2),
+                OperatorMetadata {
+                    name: "Noop2".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            );
+
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert_eq!(outcome.result, h);
+        assert!(outcome.abstentions.is_empty());
+    }
+
+    #[test]
+    fn test_apply_set_records_abstention_names_in_order() {
+        struct AbstainOp;
+        impl Operator for AbstainOp {
+            fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+                Outcome::Abstain(AbstainReason::InsufficientEvidence("test"))
+            }
+        }
+
+        let set = OperatorSet::new()
+            .register(
+                Box::new(AbstainOp),
+                OperatorMetadata {
+                    name: "First".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(AbstainOp),
+                OperatorMetadata {
+                    name: "Second".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(AbstainOp),
+                OperatorMetadata {
+                    name: "Third".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            );
+
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert_eq!(outcome.abstentions.len(), 3);
+        assert_eq!(outcome.abstentions[0].0, "First");
+        assert_eq!(outcome.abstentions[1].0, "Second");
+        assert_eq!(outcome.abstentions[2].0, "Third");
+    }
 }
