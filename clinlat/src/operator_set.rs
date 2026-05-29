@@ -6,7 +6,6 @@ use crate::abstain::AbstainReason;
 use crate::hyp::Hyp;
 use crate::operator::{Evidence, Operator};
 use crate::outcome::Outcome;
-use std::collections::BTreeMap;
 
 /// Metadata identifying a registered operator.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -35,48 +34,64 @@ pub struct SetOutcome {
 /// subsequent operators from running on the best-known hypothesis so far.
 ///
 /// **Invariant:** The result of `apply_set` is always ⊑ the input hypothesis (INV-PS-03).
+/// **Invariant:** Operators and metadata are kept in lockstep registration order.
 pub struct OperatorSet {
-    operators: Vec<Box<dyn Operator>>,
-    metadata: BTreeMap<String, OperatorMetadata>,
+    /// Operators and their metadata in registration order.
+    /// Kept as a single Vec to ensure operator order always matches metadata order.
+    operators_and_metadata: Vec<(Box<dyn Operator>, OperatorMetadata)>,
 }
 
 impl OperatorSet {
     /// Creates a new empty operator set.
     pub fn new() -> Self {
         OperatorSet {
-            operators: Vec::new(),
-            metadata: BTreeMap::new(),
+            operators_and_metadata: Vec::new(),
         }
     }
 
     /// Registers an operator with the set and returns self for chaining.
-    /// The operator name must be unique; registering a duplicate name overwrites the prior operator.
+    ///
+    /// **Panics** if an operator with the same name is already registered.
+    /// Operator names must be unique to ensure the audit trail in `SetOutcome.abstentions`
+    /// unambiguously identifies each operator that abstains.
     pub fn register(mut self, op: Box<dyn Operator>, meta: OperatorMetadata) -> Self {
-        self.operators.push(op);
-        self.metadata.insert(meta.name.clone(), meta);
+        if self
+            .operators_and_metadata
+            .iter()
+            .any(|(_, m)| m.name == meta.name)
+        {
+            panic!(
+                "OperatorSet::register: operator '{}' already registered",
+                meta.name
+            );
+        }
+        self.operators_and_metadata.push((op, meta));
         self
     }
 
     /// Returns the number of operators in the set.
     pub fn len(&self) -> usize {
-        self.operators.len()
+        self.operators_and_metadata.len()
     }
 
     /// Returns true if the operator set is empty.
     pub fn is_empty(&self) -> bool {
-        self.operators.is_empty()
+        self.operators_and_metadata.is_empty()
     }
 
     /// Returns the names of all registered operators in registration order.
     pub fn operator_names(&self) -> Vec<&str> {
-        self.metadata.values().map(|m| m.name.as_str()).collect()
+        self.operators_and_metadata
+            .iter()
+            .map(|(_, m)| m.name.as_str())
+            .collect()
     }
 
     /// Applies all operators in sequence, propagating refinements forward.
     ///
     /// **Algorithm:**
     /// 1. Start with `current_h = h.clone()`.
-    /// 2. For each operator:
+    /// 2. For each operator (in registration order):
     ///    - Call `operator.apply(&current_h, e)`.
     ///    - If `Refined(h')`: assert `h' ⊑ current_h`, then set `current_h = h'`.
     ///    - If `Abstain(r)`: record `(operator_name, r)` and leave `current_h` unchanged.
@@ -84,22 +99,29 @@ impl OperatorSet {
     ///
     /// **Semantics:** Abstention from one operator does not silence the next; each operator
     /// sees the best-known hypothesis so far. Final result ⊑ input always (OBL-PS-03).
+    ///
+    /// # Safety
+    ///
+    /// The refinement invariant (INV-PS-03) is checked via `debug_assert!` and only fires
+    /// in debug builds. In release builds, this invariant is unchecked; correctness depends
+    /// on each registered operator satisfying INV-PS-03 in its own implementation.
+    /// For clinical use, register only operators whose unit tests verify monotonicity.
     pub fn apply_set(&self, h: &Hyp, e: &Evidence) -> SetOutcome {
         let mut current_h = h.clone();
         let mut abstentions = Vec::new();
 
-        for (op, (op_name, _)) in self.operators.iter().zip(self.metadata.iter()) {
+        for (op, meta) in self.operators_and_metadata.iter() {
             match op.apply(&current_h, e) {
                 Outcome::Refined(h_prime) => {
                     debug_assert!(
                         h_prime <= current_h,
                         "INV-PS-03 violated by {}: refinement not strictly refined",
-                        op_name
+                        meta.name
                     );
                     current_h = h_prime;
                 }
                 Outcome::Abstain(reason) => {
-                    abstentions.push((op_name.clone(), reason));
+                    abstentions.push((meta.name.clone(), reason));
                 }
             }
         }
@@ -637,5 +659,110 @@ mod tests {
         let result_atoms = outcome.result.atoms();
         assert!(result_atoms.contains(&atom1));
         assert!(result_atoms.contains(&atom2));
+    }
+
+    #[test]
+    fn test_operator_names_preserves_registration_order() {
+        struct DummyOp;
+        impl Operator for DummyOp {
+            fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+                Outcome::Refined(_h.clone())
+            }
+        }
+
+        let set = OperatorSet::new()
+            .register(
+                Box::new(DummyOp),
+                OperatorMetadata {
+                    name: "Zebra".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(DummyOp),
+                OperatorMetadata {
+                    name: "Alpha".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(DummyOp),
+                OperatorMetadata {
+                    name: "Mike".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            );
+
+        let names = set.operator_names();
+        assert_eq!(names, vec!["Zebra", "Alpha", "Mike"]);
+    }
+
+    #[test]
+    fn test_abstention_names_match_registration_order() {
+        struct AbstainOp;
+        impl Operator for AbstainOp {
+            fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+                Outcome::Abstain(AbstainReason::InsufficientEvidence("test"))
+            }
+        }
+
+        let set = OperatorSet::new()
+            .register(
+                Box::new(AbstainOp),
+                OperatorMetadata {
+                    name: "Zebra".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(AbstainOp),
+                OperatorMetadata {
+                    name: "Alpha".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(AbstainOp),
+                OperatorMetadata {
+                    name: "Mike".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            );
+
+        let h = Hyp::unknown();
+        let e = test_evidence();
+
+        let outcome = set.apply_set(&h, &e);
+        assert_eq!(outcome.abstentions.len(), 3);
+        assert_eq!(outcome.abstentions[0].0, "Zebra");
+        assert_eq!(outcome.abstentions[1].0, "Alpha");
+        assert_eq!(outcome.abstentions[2].0, "Mike");
+    }
+
+    #[test]
+    #[should_panic(expected = "already registered")]
+    fn test_register_duplicate_name_panics() {
+        struct DummyOp;
+        impl Operator for DummyOp {
+            fn apply(&self, _h: &Hyp, _e: &Evidence) -> Outcome<Hyp, AbstainReason> {
+                Outcome::Refined(_h.clone())
+            }
+        }
+
+        let _set = OperatorSet::new()
+            .register(
+                Box::new(DummyOp),
+                OperatorMetadata {
+                    name: "Duplicate".to_string(),
+                    version: "v1.0.0".to_string(),
+                },
+            )
+            .register(
+                Box::new(DummyOp),
+                OperatorMetadata {
+                    name: "Duplicate".to_string(),
+                    version: "v2.0.0".to_string(),
+                },
+            );
     }
 }
