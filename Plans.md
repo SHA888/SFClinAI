@@ -122,9 +122,9 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 6b.6 | **Bug #7: Wrong abstain variant — SofaRespOperator uses InsufficientEvidence for precondition failure** — Replace with OperatorPreconditionUnmet; update abstain handling to distinguish data absence from precondition inapplicability | Score ≥3 without mechanical ventilation returns OperatorPreconditionUnmet, not InsufficientEvidence; audit tooling can now distinguish; test: `test_sofa_precondition_unmet_variant` | 2.3 | cc:todo |
-| 6b.7 | **Bug #8: Panic on zero cache — NonZeroUsize::new(cache_size).unwrap() panics in all four OntologyAdapter constructors** — Add bounds check; either panic early with descriptive message or use default (e.g., 1024) | Adapter constructors validate cache_size > 0; panic message is clear; test: `test_ontology_adapter_cache_size_validation` | 1.2, 1.3, 1.4, 1.5 | cc:todo |
-| 6b.8 | **Bug #9: SOFA boundary off-by-one — Threshold 300.0 vs Sepsis-3 table unclear** — Verify exact boundary against Sepsis-3 table (Singer et al. 2016); add test case for exactly 300.0 and document rationale in comment | SOFA threshold 300.0 matches Sepsis-3 table; test: `test_sofa_boundary_exactly_300` verifies correct score | 6.1 | cc:todo |
+| 6b.6 | **Bug #7: Wrong abstain variant — SofaRespOperator uses InsufficientEvidence for precondition failure** — Replace with OperatorPreconditionUnmet; update abstain handling to distinguish data absence from precondition inapplicability | Score ≥3 without mechanical ventilation returns OperatorPreconditionUnmet, not InsufficientEvidence; audit tooling can now distinguish; test: `test_sofa_precondition_unmet_variant` | 2.3 | cc:done [31411e7] |
+| 6b.7 | **Bug #8: Panic on zero cache — NonZeroUsize::new(cache_size).unwrap() panics in all four OntologyAdapter constructors** — Add bounds check; either panic early with descriptive message or use default (e.g., 1024) | Adapter constructors validate cache_size > 0; panic message is clear; test: `test_ontology_adapter_cache_size_validation` | 1.2, 1.3, 1.4, 1.5 | cc:done [31411e7] |
+| 6b.8 | **Bug #9: SOFA boundary off-by-one — Threshold 300.0 vs Sepsis-3 table unclear** — Verify exact boundary against Sepsis-3 table (Singer et al. 2016); add test case for exactly 300.0 and document rationale in comment | SOFA threshold 300.0 matches Sepsis-3 table; test: `test_sofa_boundary_exactly_300` verifies correct score | 6.1 | cc:done [31411e7] |
 
 ### LOW severity (maintenance)
 
