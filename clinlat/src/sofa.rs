@@ -156,8 +156,9 @@ impl SofaRespOperator {
 
     /// Compute SOFA respiratory score from PaO₂/FiO₂ ratio and ventilation status.
     ///
-    /// Returns a SNOMED-like atom representing the SOFA score, or None if preconditions unmet.
-    fn score_to_atom(score: u8) -> crate::Atom {
+    /// Returns a SNOMED-like atom representing the SOFA score, tagged with this operator's version.
+    /// Per INV-PS-05, the atom version must match self.version to maintain provenance closure.
+    fn score_to_atom(&self, score: u8) -> crate::Atom {
         let (code, preferred_term) = match score {
             0 => ("SNOMED:clinlat-sofa-resp-0", "SOFA respiratory score 0"),
             1 => ("SNOMED:clinlat-sofa-resp-1", "SOFA respiratory score 1"),
@@ -171,13 +172,13 @@ impl SofaRespOperator {
             system: crate::OntologySystem::SNOMED,
             code: code.to_string(),
             preferred_term: preferred_term.to_string(),
-            version: "clinlat-v0.2.0".to_string(),
+            version: self.version.clone(),
         }
     }
 }
 
 impl Operator for SofaRespOperator {
-    fn apply(&self, _h: &Hyp, e: &crate::operator::Evidence) -> Outcome<Hyp, AbstainReason> {
+    fn apply(&self, h: &Hyp, e: &crate::operator::Evidence) -> Outcome<Hyp, AbstainReason> {
         use crate::Ver;
 
         // Check version invariant: input provenance version must match operator version.
@@ -237,9 +238,22 @@ impl Operator for SofaRespOperator {
             ));
         }
 
-        // Create refined hypothesis with SOFA score atom.
-        let sofa_atom = Self::score_to_atom(score);
-        let refined_hyp = Hyp::new(vec![sofa_atom]);
+        // Create refined hypothesis by appending SOFA score atom to input atoms.
+        // Per INV-PS-03 (operator monotonicity), output must refine input: δ(h,e) ⊑ h.
+        // This is achieved by including all input atoms plus the new SOFA atom.
+        let sofa_atom = self.score_to_atom(score);
+        let mut refined_atoms = h.atoms().to_vec();
+        refined_atoms.push(sofa_atom);
+        let refined_hyp = Hyp::new(refined_atoms);
+
+        // Verify monotonicity: refined_hyp should have strictly more atoms (unless h was Unknown),
+        // ensuring refined_hyp ⊑ h per the refinement order.
+        debug_assert!(
+            refined_hyp <= *h,
+            "operator output must refine input: {:?} ⊑ {:?}",
+            refined_hyp.atoms(),
+            h.atoms()
+        );
 
         Outcome::Refined(refined_hyp)
     }
@@ -544,5 +558,81 @@ mod tests {
 
         let result = op.apply(&hyp, &evidence);
         assert!(matches!(result, Outcome::Refined(_)));
+    }
+
+    #[test]
+    fn test_sofa_operator_monotonicity_preserved() {
+        // Property: δ(h, e) ⊑ h (operator output refines input per INV-PS-03)
+        let op = SofaRespOperator::default_v0_2();
+        let evidence = test_evidence_pao2_fio2(350.0, 1.0, false);
+
+        // Test 1: apply to Unknown should produce a more specific hypothesis
+        let h_unknown = Hyp::unknown();
+        let result_unknown = op.apply(&h_unknown, &evidence);
+        if let Outcome::Refined(refined) = result_unknown {
+            // refined ⊑ unknown (refined is more specific)
+            assert_eq!(
+                refined.partial_cmp(&h_unknown),
+                Some(std::cmp::Ordering::Less)
+            );
+        }
+
+        // Test 2: apply to a concrete hypothesis should preserve input atoms
+        let atom_a = crate::Atom {
+            system: crate::OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "0.2.0".to_string(),
+        };
+        let h_concrete = Hyp::new(vec![atom_a.clone()]);
+        let result_concrete = op.apply(&h_concrete, &evidence);
+        if let Outcome::Refined(refined) = result_concrete {
+            // refined should contain all atoms from h_concrete plus the SOFA atom
+            let refined_atoms: std::collections::HashSet<_> =
+                refined.atoms().iter().cloned().collect();
+            assert!(
+                refined_atoms.contains(&atom_a),
+                "refined hypothesis should preserve input atoms"
+            );
+            // refined ⊑ h_concrete (refined is more specific or equal)
+            assert!(
+                refined <= h_concrete,
+                "operator must preserve refinement order"
+            );
+        }
+    }
+
+    #[test]
+    fn test_sofa_operator_version_consistency() {
+        // Property: atoms emitted by operator carry operator version (INV-PS-05)
+        let version = "0.3.0";
+        let op = SofaRespOperator::new(version);
+
+        // Create evidence with matching version
+        let origin = crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7");
+        let metadata = BTreeMap::new();
+        let prov = crate::Provenance::new(
+            origin,
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", version),
+            metadata,
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:2703-7", serde_json::json!(350.0)),
+            crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        let hyp = Hyp::unknown();
+
+        let result = op.apply(&hyp, &evidence);
+        if let Outcome::Refined(refined) = result {
+            // All atoms should have the operator's version string
+            for atom in refined.atoms() {
+                assert_eq!(
+                    atom.version, version,
+                    "operator atoms should use operator version, not hardcoded string"
+                );
+            }
+        }
     }
 }
