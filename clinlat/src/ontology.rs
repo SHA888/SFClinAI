@@ -325,6 +325,7 @@ impl SNOMEDAdapter {
         version: impl Into<String>,
         mode: CacheMode,
     ) -> Self {
+        let cache_size = if cache_size == 0 { 1024 } else { cache_size };
         SNOMEDAdapter {
             cache: std::sync::Arc::new(tokio::sync::Mutex::new(lru::LruCache::new(
                 std::num::NonZeroUsize::new(cache_size).unwrap(),
@@ -444,6 +445,7 @@ impl RxNormAdapter {
         version: impl Into<String>,
         mode: CacheMode,
     ) -> Self {
+        let cache_size = if cache_size == 0 { 1024 } else { cache_size };
         RxNormAdapter {
             cache: std::sync::Arc::new(tokio::sync::Mutex::new(lru::LruCache::new(
                 std::num::NonZeroUsize::new(cache_size).unwrap(),
@@ -563,6 +565,7 @@ impl LoincAdapter {
         version: impl Into<String>,
         mode: CacheMode,
     ) -> Self {
+        let cache_size = if cache_size == 0 { 1024 } else { cache_size };
         LoincAdapter {
             cache: std::sync::Arc::new(tokio::sync::Mutex::new(lru::LruCache::new(
                 std::num::NonZeroUsize::new(cache_size).unwrap(),
@@ -682,6 +685,7 @@ impl Icd11Adapter {
         version: impl Into<String>,
         mode: CacheMode,
     ) -> Self {
+        let cache_size = if cache_size == 0 { 1024 } else { cache_size };
         Icd11Adapter {
             cache: std::sync::Arc::new(tokio::sync::Mutex::new(lru::LruCache::new(
                 std::num::NonZeroUsize::new(cache_size).unwrap(),

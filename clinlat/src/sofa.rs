@@ -232,9 +232,10 @@ impl Operator for SofaRespOperator {
         };
 
         // Sepsis-3: Scores 3 and 4 require mechanical ventilation.
+        // This is a precondition requirement, not insufficient evidence.
         if score >= 3 && !on_mech_vent {
-            return Outcome::Abstain(AbstainReason::InsufficientEvidence(
-                "SOFA respiratory score ≥3 requires mechanical ventilation",
+            return Outcome::Abstain(AbstainReason::OperatorPreconditionUnmet(
+                "SOFA respiratory score ≥3 requires mechanical ventilation; patient not on ventilation",
             ));
         }
 
@@ -558,6 +559,48 @@ mod tests {
 
         let result = op.apply(&hyp, &evidence);
         assert!(matches!(result, Outcome::Refined(_)));
+    }
+
+    #[test]
+    fn test_sofa_operator_score_boundary_300_exactly() {
+        // Test the exact boundary at 300.0 (transition from score 1 to score 2)
+        let op = SofaRespOperator::default_v0_2();
+        let evidence = test_evidence_pao2_fio2(300.0, 1.0, false);
+        let hyp = Hyp::unknown();
+
+        let result = op.apply(&hyp, &evidence);
+        assert!(
+            matches!(result, Outcome::Refined(_)),
+            "ratio=300.0 should produce a score (either 1 or 2)"
+        );
+    }
+
+    #[test]
+    fn test_sofa_operator_score_boundary_200_exactly() {
+        // Test the exact boundary at 200.0 (transition from score 2 to score 3)
+        let op = SofaRespOperator::default_v0_2();
+        let evidence = test_evidence_pao2_fio2(200.0, 1.0, true); // score 3 requires ventilation
+        let hyp = Hyp::unknown();
+
+        let result = op.apply(&hyp, &evidence);
+        assert!(
+            matches!(result, Outcome::Refined(_)),
+            "ratio=200.0 should produce a score (either 2 or 3)"
+        );
+    }
+
+    #[test]
+    fn test_sofa_operator_score_boundary_100_exactly() {
+        // Test the exact boundary at 100.0 (transition from score 3 to score 4)
+        let op = SofaRespOperator::default_v0_2();
+        let evidence = test_evidence_pao2_fio2(100.0, 1.0, true); // score 3/4 require ventilation
+        let hyp = Hyp::unknown();
+
+        let result = op.apply(&hyp, &evidence);
+        assert!(
+            matches!(result, Outcome::Refined(_)),
+            "ratio=100.0 should produce a score (either 3 or 4)"
+        );
     }
 
     #[test]
