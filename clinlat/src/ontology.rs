@@ -45,7 +45,7 @@ use std::fmt;
 /// Each system has unique code formats and governance structures.
 ///
 /// [1]: https://github.com/SHA888/SFClinAI/blob/main/SPEC.md#21-ontology-systems
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum OntologySystem {
     /// SNOMED CT (Systematized Nomenclature of Medicine Clinical Terms).
     /// Maintained by SNOMED International. Used for diagnoses, findings, procedures.

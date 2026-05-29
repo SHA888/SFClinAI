@@ -401,10 +401,9 @@ mod tests {
         let hyp = abstract_evidence(&evidence);
 
         assert_eq!(hyp.atoms().len(), 2);
-        let atom1 = &hyp.atoms()[0];
-        let atom2 = &hyp.atoms()[1];
-        assert_eq!(atom1.system, crate::OntologySystem::LOINC);
-        assert_eq!(atom2.system, crate::OntologySystem::SNOMED);
+        let systems: std::collections::HashSet<_> = hyp.atoms().iter().map(|a| a.system).collect();
+        assert!(systems.contains(&crate::OntologySystem::LOINC));
+        assert!(systems.contains(&crate::OntologySystem::SNOMED));
     }
 
     #[test]

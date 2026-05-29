@@ -24,8 +24,26 @@ pub struct Hyp(Vec<Atom>);
 
 impl Hyp {
     /// Creates a new hypothesis from a list of atoms.
+    ///
+    /// Atoms are deduplicated and sorted by (system, code) to ensure consistency
+    /// between `PartialEq` (Vec comparison) and `PartialOrd` (HashSet comparison).
+    /// This enforces that duplicate atoms are collapsed to a single logical entry,
+    /// preventing INV-PS-02 violations where `meet()` would fail on semantically
+    /// identical hypotheses that differ only by atom duplication.
     pub fn new(atoms: Vec<Atom>) -> Self {
-        Hyp(atoms)
+        let mut deduplicated: Vec<Atom> = atoms;
+        deduplicated.sort_by(|a, b| {
+            // Sort by (system, code) first, then by version for determinism
+            match a.system.cmp(&b.system) {
+                Ordering::Equal => match a.code.cmp(&b.code) {
+                    Ordering::Equal => a.version.cmp(&b.version),
+                    other => other,
+                },
+                other => other,
+            }
+        });
+        deduplicated.dedup();
+        Hyp(deduplicated)
     }
 
     /// Creates the top element (most general hypothesis, `Unknown`).
@@ -223,5 +241,46 @@ mod tests {
 
         // Incomparable hypotheses have no meet.
         assert_eq!(h1.meet(&h2), None);
+    }
+
+    #[test]
+    fn test_hyp_duplicate_atoms_deduplicated() {
+        let atom = atom_diagnosis_a();
+        // Create a Hyp with the same atom twice.
+        let h_with_dup = Hyp::new(vec![atom.clone(), atom.clone()]);
+        let h_deduped = Hyp::new(vec![atom]);
+
+        // After deduplication, they should be equal.
+        assert_eq!(h_with_dup, h_deduped);
+        // And they should have the same ordering comparison.
+        assert_eq!(h_with_dup.partial_cmp(&h_deduped), Some(Ordering::Equal));
+        // And meet should work (not return None).
+        assert_eq!(h_with_dup.meet(&h_deduped), Some(h_deduped));
+    }
+
+    #[test]
+    fn test_hyp_atoms_sorted_deterministically() {
+        let atom_a = atom_diagnosis_a();
+        let atom_b = atom_diagnosis_b();
+        let atom_s = atom_severity_high();
+
+        // Create hypotheses with atoms in different orders.
+        let h1 = Hyp::new(vec![atom_s.clone(), atom_a.clone(), atom_b.clone()]);
+        let h2 = Hyp::new(vec![atom_b.clone(), atom_s.clone(), atom_a.clone()]);
+
+        // After normalization, they should be equal (same sorted order).
+        assert_eq!(h1, h2);
+        // And atoms() should return them in sorted order.
+        let atoms = h1.atoms();
+        assert_eq!(atoms.len(), 3);
+        // Atoms should be sorted by (system, code).
+        for i in 1..atoms.len() {
+            assert!(
+                (atoms[i - 1].system, &atoms[i - 1].code) <= (atoms[i].system, &atoms[i].code),
+                "atoms not sorted: {:?} > {:?}",
+                atoms[i - 1],
+                atoms[i]
+            );
+        }
     }
 }
