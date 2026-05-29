@@ -101,6 +101,7 @@ pub mod outcome;
 pub mod provenance;
 pub mod sofa;
 pub mod version;
+pub mod wells_pe;
 
 pub use abstain::AbstainReason;
 pub use hyp::Hyp;
@@ -115,3 +116,4 @@ pub use outcome::Outcome;
 pub use provenance::{Provenance, ProvenanceOrigin};
 pub use sofa::{SofaRespEvidence, SofaRespHypothesis, SofaRespOperator};
 pub use version::Ver;
+pub use wells_pe::WellsPeOperator;
