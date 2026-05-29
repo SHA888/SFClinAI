@@ -130,9 +130,9 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 6b.9 | **Bug #10: Lock release in cache — concurrent cache misses cause redundant inserts** — Hold lock across get+put or use entry API; document rationale for chosen pattern | SNOMEDAdapter (and other adapters) hold lock across get and conditional put; comments explain why; redundant inserts now rare; test: `test_cache_concurrent_misses_idempotent` | 1.2, 1.3, 1.4, 1.5 | cc:todo |
-| 6b.10 | **Bug #11: AbstainReason too simple — carries &'static str instead of structured payloads per SPEC.md DEF-PS-10** — Document as v0.1.0 simplification; add TODO or create v0.2.0+ card in backlog | AbstainReason documented with SPEC.md DEF-PS-10 reference; TODO comment added; SPEC.md §7 open question created if not already present | 1.1 | cc:todo |
-| 6b.11 | **Property-test verification of all fixes** — Run full test suite; verify OBL-PS-02 adjunction, OBL-PS-03 operator composition, INV-PS-01 through INV-PS-06 | `cargo test --lib` passes all; property-test suite covers refined fixes; `cargo clippy` clean | 6b.1–6b.10 | cc:todo |
+| 6b.9 | **Bug #10: Lock release in cache — concurrent cache misses cause redundant inserts** — Hold lock across get+put or use entry API; document rationale for chosen pattern | SNOMEDAdapter (and other adapters) hold lock across get and conditional put; comments explain why; redundant inserts now rare; test: `test_cache_concurrent_misses_idempotent` | 1.2, 1.3, 1.4, 1.5 | cc:done [a9aa92d] |
+| 6b.10 | **Bug #11: AbstainReason too simple — carries &'static str instead of structured payloads per SPEC.md DEF-PS-10** — Document as v0.1.0 simplification; add TODO or create v0.2.0+ card in backlog | AbstainReason documented with SPEC.md DEF-PS-10 reference; TODO comment added; SPEC.md §7 open question created if not already present | 1.1 | cc:done [a9aa92d] |
+| 6b.11 | **Property-test verification of all fixes** — Run full test suite; verify OBL-PS-02 adjunction, OBL-PS-03 operator composition, INV-PS-01 through INV-PS-06 | `cargo test --lib` passes all; property-test suite covers refined fixes; `cargo clippy` clean | 6b.1–6b.10 | cc:done [a9aa92d] |
 
 ---
 
