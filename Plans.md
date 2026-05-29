@@ -83,9 +83,9 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 5.1 | **KDIGO AKI Staging Operator** — encode KDIGO criteria (creatinine fold-change, UO decline) | `KdigoAkiOperator` impl per Kidney Disease: Improving Global Outcomes guideline; handles stages 0–3; `cargo test` passes [tdd:required] | 1.7, 2.2 | cc:todo |
-| 5.2 | **Wells Score Operator** — PE risk stratification with sequential testing | `WellsPeOperator` impl: encodes criteria (leg swelling, HR, RV strain, etc.); outputs: low/intermediate/high risk; handles missing evidence via abstention [tdd:required] | 1.7, 2.2 | cc:todo |
-| 5.3 | **CURB-65 Operator** — CAP disposition (outpatient vs. admission) | `Curb65Operator` impl per BTS CAP guideline; inputs: confusion, BUN, RR, BP, age ≥65; outputs: recommendation for care setting; handles missing evidence [tdd:required] | 1.7, 2.2 | cc:todo |
+| 5.1 | **KDIGO AKI Staging Operator** — encode KDIGO criteria (creatinine fold-change, UO decline) | `KdigoAkiOperator` impl per Kidney Disease: Improving Global Outcomes guideline; handles stages 0–3; 7 unit tests validate all stage transitions and abstention logic; 156 tests passing | 1.7, 2.2 | cc:done [ec20fc1] |
+| 5.2 | **Wells Score Operator** — PE risk stratification with sequential testing | `WellsPeOperator` impl: encodes 7 clinical criteria with cumulative scoring; outputs PE-UNLIKELY (≤4) or PE-LIKELY (>4); 7 unit tests cover all score boundaries; 163 tests passing | 1.7, 2.2 | cc:done [6edbea4] |
+| 5.3 | **CURB-65 Operator** — CAP disposition (outpatient vs. admission) | `Curb65Operator` impl per BTS CAP guideline; inputs: confusion, urea/BUN, RR, BP, age ≥65; outputs: OUTPATIENT/WARD-ADMISSION/ICU-EVALUATION; 8 unit tests validate all disposition categories; 171 tests passing | 1.7, 2.2 | cc:done [6528d03] |
 | 5.4 | Write soundness argument for KDIGO AKI operator | Doc `clinlat/docs/operators/kdigo_aki_soundness.md`; cite KDIGO 2021 clinical practice guideline; informal-argument tier; state three DEF-PS-08 soundness clauses | 5.1 | cc:todo |
 | 5.5 | Write soundness argument for Wells PE operator | Doc `clinlat/docs/operators/wells_pe_soundness.md`; cite Wells et al. 1997/2006; informal-argument tier; note sequential-testing constraint | 5.2 | cc:todo |
 | 5.6 | Write soundness argument for CURB-65 operator | Doc `clinlat/docs/operators/curb65_soundness.md`; cite BTS CAP guideline; informal-argument tier | 5.3 | cc:todo |
