@@ -93,6 +93,7 @@
 
 pub mod abstain;
 pub mod hyp;
+pub mod kdigo_aki;
 pub mod ontology;
 pub mod operator;
 pub mod operator_set;
@@ -103,6 +104,7 @@ pub mod version;
 
 pub use abstain::AbstainReason;
 pub use hyp::Hyp;
+pub use kdigo_aki::KdigoAkiOperator;
 pub use ontology::{
     Atom, CacheMode, Icd11Adapter, LoincAdapter, OntologyAdapter, OntologyError, OntologySystem,
     RxNormAdapter, SNOMEDAdapter,
