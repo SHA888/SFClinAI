@@ -678,4 +678,405 @@ mod tests {
             }
         }
     }
+
+    // Property test suite (≥21 cases via iteration over ranges)
+    // Instead of proptest! macro, we use simple loops to test multiple values
+
+    #[test]
+    fn prop_score_boundaries_all_bands() {
+        // Test that each ratio falls into the correct SOFA band
+        let test_cases = vec![
+            (500.0, Some(0)), // ≥400
+            (400.0, Some(0)), // boundary
+            (399.0, Some(1)), // just below boundary
+            (350.0, Some(1)), // 300-399
+            (300.0, Some(1)), // boundary
+            (299.0, Some(2)), // just below
+            (250.0, Some(2)), // 200-299
+            (200.0, Some(2)), // boundary
+            (199.0, Some(3)), // just below (with vent)
+            (150.0, Some(3)), // 100-199 (with vent)
+            (100.0, Some(3)), // boundary (with vent)
+            (99.0, Some(4)),  // just below (with vent)
+            (50.0, Some(4)),  // 0-100 (with vent)
+        ];
+        for (ratio, expected) in test_cases {
+            assert_eq!(
+                score_from_ratio(ratio, true),
+                expected,
+                "ratio {} failed",
+                ratio
+            );
+        }
+    }
+
+    #[test]
+    fn prop_monotonicity_decreasing_ratios() {
+        // Lower ratios should produce higher (worse) scores
+        let ratios = vec![500.0, 350.0, 250.0, 150.0, 50.0];
+        let mut prev_score: Option<u8> = None;
+        for ratio in ratios {
+            let score = score_from_ratio(ratio, true);
+            if let (Some(prev), Some(curr)) = (prev_score, score) {
+                assert!(
+                    curr >= prev,
+                    "monotonicity violated: {} should have >= score than {}",
+                    ratio,
+                    50.0
+                );
+            }
+            prev_score = score;
+        }
+    }
+
+    #[test]
+    fn prop_no_vent_high_scores_abstain() {
+        // Scores 3-4 require ventilation
+        let no_vent_ratios = vec![150.0, 100.0, 99.0, 50.0, 25.0];
+        for ratio in no_vent_ratios {
+            let score = score_from_ratio(ratio, false);
+            assert!(
+                score.is_none() || score == Some(0) || score == Some(1) || score == Some(2),
+                "ratio {} without vent should not give 3 or 4",
+                ratio
+            );
+        }
+    }
+
+    #[test]
+    fn prop_no_vent_low_scores_exist() {
+        // Scores 0-2 should work without ventilation
+        let low_vent_ratios = vec![500.0, 400.0, 350.0, 300.0, 250.0, 200.0];
+        for ratio in low_vent_ratios {
+            let score = score_from_ratio(ratio, false);
+            assert!(
+                score.is_some(),
+                "ratio {} without vent should give some score",
+                ratio
+            );
+        }
+    }
+
+    #[test]
+    fn prop_with_vent_all_ratios_covered() {
+        // Any positive ratio with vent should return Some score
+        let vent_ratios = vec![
+            0.1, 10.0, 50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 500.0,
+        ];
+        for ratio in vent_ratios {
+            let score = score_from_ratio(ratio, true);
+            assert!(
+                score.is_some(),
+                "ratio {} with vent should always return Some",
+                ratio
+            );
+        }
+    }
+
+    #[test]
+    fn prop_operator_version_mismatch() {
+        // Operator should abstain if evidence version doesn't match operator version
+        let op = SofaRespOperator::new("0.2.0");
+        let origin = crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7");
+        let prov = crate::Provenance::new(
+            origin,
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", "0.3.0"), // wrong version
+            BTreeMap::new(),
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:2703-7", serde_json::json!(250.0)),
+            crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        let result = op.apply(&Hyp::unknown(), &evidence);
+        match result {
+            Outcome::Abstain(AbstainReason::OperatorPreconditionUnmet(_)) => {}
+            other => panic!("expected version mismatch abstention, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn prop_operator_zero_fio2() {
+        // Operator should abstain if FiO2 is zero
+        let op = SofaRespOperator::new("0.2.0");
+        let prov = crate::Provenance::new(
+            crate::ProvenanceOrigin::new("lab", "LOINC", "3150-0"),
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+            BTreeMap::new(),
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:2703-7", serde_json::json!(250.0)),
+            crate::Observation::new("LOINC:3150-0", serde_json::json!(0.0)), // zero FiO2
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        let result = op.apply(&Hyp::unknown(), &evidence);
+        match result {
+            Outcome::Abstain(AbstainReason::InsufficientEvidence(_)) => {}
+            other => panic!(
+                "expected InsufficientEvidence for zero FiO2, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn prop_operator_missing_pao2() {
+        // Operator should abstain if PaO2 observation is missing
+        let op = SofaRespOperator::new("0.2.0");
+        let prov = crate::Provenance::new(
+            crate::ProvenanceOrigin::new("lab", "LOINC", "3150-0"),
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+            BTreeMap::new(),
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+            // Missing LOINC:2703-7
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        let result = op.apply(&Hyp::unknown(), &evidence);
+        match result {
+            Outcome::Abstain(AbstainReason::InsufficientEvidence(_)) => {}
+            other => panic!(
+                "expected InsufficientEvidence for missing PaO2, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn prop_operator_missing_fio2() {
+        // Operator should abstain if FiO2 observation is missing
+        let op = SofaRespOperator::new("0.2.0");
+        let prov = crate::Provenance::new(
+            crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7"),
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+            BTreeMap::new(),
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:2703-7", serde_json::json!(250.0)),
+            // Missing LOINC:3150-0
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        let result = op.apply(&Hyp::unknown(), &evidence);
+        match result {
+            Outcome::Abstain(AbstainReason::InsufficientEvidence(_)) => {}
+            other => panic!(
+                "expected InsufficientEvidence for missing FiO2, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn prop_operator_score3_no_vent_abstains_all() {
+        // Score 3-4 (low ratios) without vent should abstain
+        let low_ratios = vec![150.0, 125.0, 100.0, 99.0, 50.0, 25.0, 10.0, 1.0];
+        for ratio in low_ratios {
+            let op = SofaRespOperator::new("0.2.0");
+            let prov = crate::Provenance::new(
+                crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7"),
+                Utc::now(),
+                crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+                BTreeMap::new(),
+            );
+            let observations = vec![
+                crate::Observation::new("LOINC:2703-7", serde_json::json!(ratio)),
+                crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+                // No vent flag
+            ];
+            let evidence = crate::Evidence::new(observations, prov);
+            let result = op.apply(&Hyp::unknown(), &evidence);
+            match result {
+                Outcome::Abstain(AbstainReason::OperatorPreconditionUnmet(_)) => {}
+                other => panic!(
+                    "ratio {} without vent should abstain (score 3-4), got {:?}",
+                    ratio, other
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn prop_operator_valid_vent_input_refines() {
+        // Valid input with vent should always refine
+        let valid_ratios = vec![500.0, 250.0, 150.0, 100.0, 50.0, 10.0];
+        for ratio in valid_ratios {
+            let op = SofaRespOperator::new("0.2.0");
+            let prov = crate::Provenance::new(
+                crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7"),
+                Utc::now(),
+                crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+                BTreeMap::new(),
+            );
+            let observations = vec![
+                crate::Observation::new("LOINC:2703-7", serde_json::json!(ratio)),
+                crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+                crate::Observation::new("SNOMED:243144002", serde_json::json!(true)), // vent
+            ];
+            let evidence = crate::Evidence::new(observations, prov);
+            let result = op.apply(&Hyp::unknown(), &evidence);
+            match result {
+                Outcome::Refined(_) => {}
+                other => panic!("ratio {} with vent should refine, got {:?}", ratio, other),
+            }
+        }
+    }
+
+    #[test]
+    fn prop_refined_atom_version_matches() {
+        // Refined atoms should have operator version
+        let version = "0.2.1";
+        let op = SofaRespOperator::new(version);
+        let prov = crate::Provenance::new(
+            crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7"),
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", version),
+            BTreeMap::new(),
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:2703-7", serde_json::json!(250.0)),
+            crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+            crate::Observation::new("SNOMED:243144002", serde_json::json!(true)),
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        if let Outcome::Refined(h_prime) = op.apply(&Hyp::unknown(), &evidence) {
+            for atom in h_prime.atoms() {
+                if atom.code.contains("sofa-resp") {
+                    assert_eq!(atom.version, version);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn prop_refined_atom_system_snomed() {
+        // Refined atoms should use SNOMED system
+        let op = SofaRespOperator::new("0.2.0");
+        let prov = crate::Provenance::new(
+            crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7"),
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+            BTreeMap::new(),
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:2703-7", serde_json::json!(250.0)),
+            crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+            crate::Observation::new("SNOMED:243144002", serde_json::json!(true)),
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        if let Outcome::Refined(h_prime) = op.apply(&Hyp::unknown(), &evidence) {
+            for atom in h_prime.atoms() {
+                if atom.code.contains("sofa-resp") {
+                    assert_eq!(atom.system, crate::OntologySystem::SNOMED);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn prop_refinement_monotonicity_inv_ps03() {
+        // Refined hypothesis should refine input (h' ⊑ h)
+        let op = SofaRespOperator::new("0.2.0");
+        let h_input = Hyp::unknown();
+        let prov = crate::Provenance::new(
+            crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7"),
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+            BTreeMap::new(),
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:2703-7", serde_json::json!(250.0)),
+            crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+            crate::Observation::new("SNOMED:243144002", serde_json::json!(true)),
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        if let Outcome::Refined(h_prime) = op.apply(&h_input, &evidence) {
+            assert!(h_prime <= h_input, "INV-PS-03: refined must refine input");
+        }
+    }
+
+    #[test]
+    fn prop_refined_adds_one_atom() {
+        // Refining should add exactly one atom
+        let op = SofaRespOperator::new("0.2.0");
+        let h_input = Hyp::unknown();
+        let prov = crate::Provenance::new(
+            crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7"),
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+            BTreeMap::new(),
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:2703-7", serde_json::json!(250.0)),
+            crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+            crate::Observation::new("SNOMED:243144002", serde_json::json!(true)),
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        if let Outcome::Refined(h_prime) = op.apply(&h_input, &evidence) {
+            let atoms_added = h_prime.atoms().len() - h_input.atoms().len();
+            assert_eq!(atoms_added, 1, "exactly one atom should be added");
+        }
+    }
+
+    #[test]
+    fn prop_refined_code_contains_sofa_resp() {
+        // Refined atoms should have correct SOFA code
+        let op = SofaRespOperator::new("0.2.0");
+        let prov = crate::Provenance::new(
+            crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7"),
+            Utc::now(),
+            crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+            BTreeMap::new(),
+        );
+        let observations = vec![
+            crate::Observation::new("LOINC:2703-7", serde_json::json!(250.0)),
+            crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+            crate::Observation::new("SNOMED:243144002", serde_json::json!(true)),
+        ];
+        let evidence = crate::Evidence::new(observations, prov);
+        if let Outcome::Refined(h_prime) = op.apply(&Hyp::unknown(), &evidence) {
+            let has_sofa = h_prime
+                .atoms()
+                .iter()
+                .any(|a| a.code.contains("clinlat-sofa-resp"));
+            assert!(has_sofa, "refined should contain sofa-resp atom");
+        }
+    }
+
+    #[test]
+    fn prop_refined_code_score_matches() {
+        // Refined code should contain the expected score
+        let test_cases = vec![(500.0, 0), (350.0, 1), (250.0, 2), (150.0, 3)];
+        for (ratio, expected_score) in test_cases {
+            let op = SofaRespOperator::new("0.2.0");
+            let prov = crate::Provenance::new(
+                crate::ProvenanceOrigin::new("lab", "LOINC", "2703-7"),
+                Utc::now(),
+                crate::Ver::new("clinlat", "sofa_resp", "0.2.0"),
+                BTreeMap::new(),
+            );
+            let observations = vec![
+                crate::Observation::new("LOINC:2703-7", serde_json::json!(ratio)),
+                crate::Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+                crate::Observation::new("SNOMED:243144002", serde_json::json!(true)),
+            ];
+            let evidence = crate::Evidence::new(observations, prov);
+            if let Outcome::Refined(h_prime) = op.apply(&Hyp::unknown(), &evidence) {
+                let score_str = expected_score.to_string();
+                let has_score = h_prime
+                    .atoms()
+                    .iter()
+                    .any(|a| a.code.contains(&format!("-{}", score_str)));
+                assert!(
+                    has_score,
+                    "ratio {} should produce score {} in atom code",
+                    ratio, expected_score
+                );
+            }
+        }
+    }
 }
