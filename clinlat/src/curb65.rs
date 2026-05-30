@@ -62,8 +62,8 @@ impl Curb65Operator {
             .iter()
             .find(|obs| obs.code == "UREA" || obs.code == "BUN")
         {
-            urea_available = true;
             if let Some(val) = obs.value.as_f64() {
+                urea_available = true;
                 // Check if UREA (mmol/L) or BUN (mg/dL)
                 let elevated = if obs.code == "UREA" {
                     val > 7.0
@@ -93,7 +93,8 @@ impl Curb65Operator {
                     score += 1;
                 }
             }
-        } else if let Some(obs) = observations.iter().find(|obs| obs.code == "DBP") {
+        }
+        if let Some(obs) = observations.iter().find(|obs| obs.code == "DBP") {
             if let Some(dbp) = obs.value.as_f64() {
                 if dbp <= 60.0 {
                     score += 1;
@@ -335,6 +336,63 @@ mod tests {
                 );
             }
             Outcome::Abstain(_) => panic!("test setup should not abstain"),
+        }
+    }
+
+    #[test]
+    fn test_curb65_dbp_criterion_not_lost() {
+        let op = Curb65Operator::new("0.1.0");
+        // SBP normal (95.0, not <90) but DBP abnormal (55.0, ≤60)
+        // Bug: else-if would skip DBP check when SBP present
+        // Fix: both criteria now checked independently; score should be 1
+        let observations = vec![
+            Observation::new("SBP", serde_json::json!(95.0)),
+            Observation::new("DBP", serde_json::json!(55.0)),
+            Observation::new("AGE", serde_json::json!(70.0)),
+        ];
+        let e = test_evidence_with_observations(observations);
+        let h = Hyp::unknown();
+
+        let outcome = op.apply(&h, &e);
+        match outcome {
+            Outcome::Refined(h_prime) => {
+                let atoms = h_prime.atoms();
+                // Score = 2 (DBP + Age), so WARD-ADMISSION
+                assert!(atoms.iter().any(|a| a.code.contains("WARD-ADMISSION")));
+            }
+            Outcome::Abstain(_) => panic!("should refine; DBP criterion should be evaluated"),
+        }
+    }
+
+    #[test]
+    fn test_curb65_unparseable_urea_not_available() {
+        let op = Curb65Operator::new("0.1.0");
+        // Urea observation with unparseable value ('pending' string)
+        // Bug: urea_available set true even though value cannot parse as f64
+        // Fix: only set urea_available = true if value parses successfully
+        let mut obs = vec![
+            Observation::new("AGE", serde_json::json!(75.0)),
+            Observation::new("CONFUSION", serde_json::json!(true)),
+        ];
+        // Add a urea observation with unparseable value
+        obs.push(Observation::new("UREA", serde_json::json!("pending")));
+
+        let e = test_evidence_with_observations(obs);
+        let h = Hyp::unknown();
+
+        let outcome = op.apply(&h, &e);
+        match outcome {
+            Outcome::Refined(h_prime) => {
+                let atoms = h_prime.atoms();
+                // Score = 2 (Age + Confusion, urea not counted because unparseable)
+                // This should be WARD-ADMISSION (not higher)
+                assert!(atoms.iter().any(|a| a.code.contains("WARD-ADMISSION")));
+                // Verify that urea's failure to parse didn't incorrectly boost the score
+                assert!(!atoms.iter().any(|a| a.code.contains("ICU-EVALUATION")));
+            }
+            Outcome::Abstain(_) => {
+                panic!("should refine; unparseable urea should not cause abstention")
+            }
         }
     }
 }
