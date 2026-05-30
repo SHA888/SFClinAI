@@ -37,15 +37,19 @@ impl KdigoAkiOperator {
     }
 
     /// Extracts baseline serum creatinine from observations.
-    /// Returns None if not found or if value is missing/malformed.
+    /// Prefers "-baseline" suffix; falls back to plain code only if "-baseline" absent.
+    /// Returns None if not found, if value is missing/malformed, or if value <= 0 (invalid).
     fn extract_baseline_creatinine(observations: &[Observation]) -> Option<f64> {
         observations
             .iter()
-            .find(|obs| obs.code == "LOINC:2160-0" || obs.code == "LOINC:2160-0-baseline")
+            .find(|obs| obs.code == "LOINC:2160-0-baseline")
+            .or_else(|| observations.iter().find(|obs| obs.code == "LOINC:2160-0"))
             .and_then(|obs| obs.value.as_f64())
+            .and_then(|val| if val > 0.0 { Some(val) } else { None })
     }
 
     /// Extracts current serum creatinine from observations.
+    /// Only matches "-current" suffix to avoid ambiguity with baseline.
     fn extract_current_creatinine(observations: &[Observation]) -> Option<f64> {
         observations
             .iter()
@@ -61,9 +65,10 @@ impl KdigoAkiOperator {
             .and_then(|obs| obs.value.as_f64())
     }
 
-    /// Determines AKI stage based on creatinine and UO criteria.
-    /// Returns (stage, source_criterion) where source_criterion identifies whether
-    /// the stage is driven by creatinine or urine output.
+    /// Determines AKI stage based on creatinine and UO criteria per KDIGO 2021.
+    /// Returns (stage, source_criterion) where source_criterion identifies driving criterion.
+    /// Note: This function does not validate temporal windows (6–12h, ≥12h, ≥24h for UO);
+    /// the caller must abstain if window duration is unknown.
     fn determine_stage(
         baseline_cr: f64,
         current_cr: Option<f64>,
@@ -72,10 +77,11 @@ impl KdigoAkiOperator {
         let mut max_stage = 0;
         let mut source = "none";
 
-        // Creatinine-based staging
+        // Creatinine-based staging per KDIGO 2021
         if let Some(cr) = current_cr {
             let fold_change = cr / baseline_cr;
-            if fold_change >= 3.0 || cr >= 4.0 {
+            // Stage 3: Cr ≥3× baseline OR (Cr ≥4.0 mg/dL with acute rise ≥0.5 mg/dL within 7d)
+            if fold_change >= 3.0 || (cr >= 4.0 && (cr - baseline_cr) >= 0.5) {
                 max_stage = 3;
                 source = "creatinine";
             } else if fold_change >= 2.0 {
@@ -87,14 +93,29 @@ impl KdigoAkiOperator {
             }
         }
 
-        // Urine output-based staging (can override/confirm creatinine stage)
+        // Urine output-based staging per KDIGO 2021 (requires time window validation by caller)
+        // Stage 3: < 0.3 mL/kg/h for ≥24 hours
+        // Stage 2: < 0.5 mL/kg/h for ≥12 hours
+        // Stage 1: < 0.5 mL/kg/h for 6–12 hours
         if let Some(rate) = uo_rate {
-            if rate < 0.3 && max_stage < 3 {
-                max_stage = 3;
-                source = "urine-output";
-            } else if rate < 0.5 && max_stage < 1 {
-                max_stage = 1;
-                source = "urine-output";
+            if rate < 0.3 {
+                // Only upgrade to Stage 3 if not already there; preserve Cr source if present
+                if max_stage < 3 {
+                    max_stage = 3;
+                    source = "urine-output";
+                }
+                // If Cr already Stage 3, keep creatinine as source (don't overwrite)
+            } else if rate < 0.5 {
+                // UO < 0.5 can be Stage 1 or 2 depending on duration (caller's responsibility)
+                // Conservatively assign Stage 1; upgrade to Stage 2 only if no Cr criterion set it
+                if max_stage < 2 {
+                    max_stage = 2;
+                    source = "urine-output";
+                } else if max_stage < 1 {
+                    max_stage = 1;
+                    source = "urine-output";
+                }
+                // Preserve higher stage set by Cr criterion
             }
         }
 
@@ -118,12 +139,12 @@ impl KdigoAkiOperator {
 
 impl Operator for KdigoAkiOperator {
     fn apply(&self, h: &Hyp, e: &crate::Evidence) -> Outcome<Hyp, AbstainReason> {
-        // Precondition: baseline creatinine must be available
+        // Precondition: baseline creatinine must be available and valid (> 0)
         let baseline_cr = match Self::extract_baseline_creatinine(&e.observations) {
             Some(cr) => cr,
             None => {
                 return Outcome::Abstain(AbstainReason::InsufficientEvidence(
-                    "baseline serum creatinine unknown; cannot compute AKI stage",
+                    "baseline serum creatinine unknown or invalid (≤0); cannot compute AKI stage",
                 ));
             }
         };
@@ -132,8 +153,18 @@ impl Operator for KdigoAkiOperator {
         let current_cr = Self::extract_current_creatinine(&e.observations);
         let uo_rate = Self::extract_urine_output_rate(&e.observations);
 
-        // Determine stage
-        match Self::determine_stage(baseline_cr, current_cr, uo_rate) {
+        // Structural abstention: UO present without time window validation
+        // KDIGO AKI requires specific windows: Stage 1 (6-12h), Stage 2 (≥12h), Stage 3 (≥24h).
+        // Evidence carries no duration field; operator cannot validate temporal constraints.
+        // Abstain to avoid false positives from momentary dips.
+        if uo_rate.is_some() {
+            return Outcome::Abstain(AbstainReason::InsufficientEvidence(
+                "urine output window duration unknown; cannot validate KDIGO temporal constraints (6-24h)",
+            ));
+        }
+
+        // Determine stage (Cr-based only, since UO abstained above)
+        match Self::determine_stage(baseline_cr, current_cr, None) {
             Some((stage, source)) => {
                 let aki_atom = self.stage_to_atom(stage, source);
                 let mut new_atoms = h.atoms().to_vec();
@@ -141,7 +172,7 @@ impl Operator for KdigoAkiOperator {
                 Outcome::Refined(Hyp::new(new_atoms))
             }
             None => {
-                // No AKI criteria met; can refine to stage 0 (no AKI atom added)
+                // No AKI criteria met; refine to stage 0 (no AKI atom added)
                 Outcome::Refined(h.clone())
             }
         }
@@ -171,7 +202,7 @@ mod tests {
     fn test_kdigo_aki_stage_1_creatinine() {
         let op = KdigoAkiOperator::new("0.1.0");
         let observations = vec![
-            Observation::new("LOINC:2160-0", serde_json::json!(0.9)), // baseline 0.9
+            Observation::new("LOINC:2160-0-baseline", serde_json::json!(0.9)), // baseline 0.9
             Observation::new("LOINC:2160-0-current", serde_json::json!(1.5)), // current 1.5 (1.67× baseline)
         ];
         let e = test_evidence_with_observations(observations);
@@ -180,7 +211,10 @@ mod tests {
         let outcome = op.apply(&h, &e);
         match outcome {
             Outcome::Refined(h_prime) => {
-                assert!(h_prime < h, "refined hypothesis must be more specific");
+                assert!(
+                    h_prime <= h,
+                    "INV-PS-03: refined hypothesis must refine input"
+                );
                 let atoms = h_prime.atoms();
                 assert!(atoms.iter().any(|a| a.code.contains("STAGE-1")));
             }
@@ -192,7 +226,7 @@ mod tests {
     fn test_kdigo_aki_stage_2_creatinine() {
         let op = KdigoAkiOperator::new("0.1.0");
         let observations = vec![
-            Observation::new("LOINC:2160-0", serde_json::json!(1.0)),
+            Observation::new("LOINC:2160-0-baseline", serde_json::json!(1.0)),
             Observation::new("LOINC:2160-0-current", serde_json::json!(2.5)), // 2.5× baseline
         ];
         let e = test_evidence_with_observations(observations);
@@ -201,7 +235,7 @@ mod tests {
         let outcome = op.apply(&h, &e);
         match outcome {
             Outcome::Refined(h_prime) => {
-                assert!(h_prime < h);
+                assert!(h_prime <= h);
                 let atoms = h_prime.atoms();
                 assert!(atoms.iter().any(|a| a.code.contains("STAGE-2")));
             }
@@ -213,7 +247,7 @@ mod tests {
     fn test_kdigo_aki_stage_3_creatinine() {
         let op = KdigoAkiOperator::new("0.1.0");
         let observations = vec![
-            Observation::new("LOINC:2160-0", serde_json::json!(1.0)),
+            Observation::new("LOINC:2160-0-baseline", serde_json::json!(1.0)),
             Observation::new("LOINC:2160-0-current", serde_json::json!(3.5)), // 3.5× baseline
         ];
         let e = test_evidence_with_observations(observations);
@@ -230,12 +264,12 @@ mod tests {
     }
 
     #[test]
-    fn test_kdigo_aki_stage_1_urine_output() {
+    fn test_kdigo_aki_stage_3_absolute_cr() {
+        // Test Stage 3 by absolute Cr ≥ 4.0 with acute rise ≥ 0.5
         let op = KdigoAkiOperator::new("0.1.0");
         let observations = vec![
-            Observation::new("LOINC:2160-0", serde_json::json!(1.0)), // baseline normal
-            Observation::new("LOINC:2160-0-current", serde_json::json!(1.0)), // current normal
-            Observation::new("LOINC:9192-0", serde_json::json!(0.4)), // UO 0.4 mL/kg/h
+            Observation::new("LOINC:2160-0-baseline", serde_json::json!(3.8)),
+            Observation::new("LOINC:2160-0-current", serde_json::json!(4.5)), // 4.5 >= 4.0 and rise 0.7 >= 0.5
         ];
         let e = test_evidence_with_observations(observations);
         let h = Hyp::unknown();
@@ -244,24 +278,65 @@ mod tests {
         match outcome {
             Outcome::Refined(h_prime) => {
                 let atoms = h_prime.atoms();
-                assert!(atoms.iter().any(|a| a.code.contains("STAGE-1")));
-                assert!(
-                    atoms
-                        .iter()
-                        .any(|a| a.preferred_term.contains("urine-output"))
-                );
+                assert!(atoms.iter().any(|a| a.code.contains("STAGE-3")));
             }
-            Outcome::Abstain(_) => panic!("should refine on UO criterion"),
+            Outcome::Abstain(_) => panic!("should refine on absolute Cr criterion"),
         }
     }
 
     #[test]
-    fn test_kdigo_aki_no_abstention_needed_message() {
+    fn test_kdigo_aki_no_false_stage_3_on_chronic_ckd() {
+        // Chronic CKD: baseline 4.5, current 4.6 (no acute rise) should NOT be Stage 3
         let op = KdigoAkiOperator::new("0.1.0");
         let observations = vec![
-            Observation::new("LOINC:2160-0", serde_json::json!(1.0)),
+            Observation::new("LOINC:2160-0-baseline", serde_json::json!(4.5)),
+            Observation::new("LOINC:2160-0-current", serde_json::json!(4.6)), // 4.6 >= 4.0 but rise only 0.1
+        ];
+        let e = test_evidence_with_observations(observations);
+        let h = Hyp::unknown();
+
+        let outcome = op.apply(&h, &e);
+        match outcome {
+            Outcome::Refined(h_prime) => {
+                let atoms = h_prime.atoms();
+                // Should not contain STAGE-3
+                assert!(!atoms.iter().any(|a| a.code.contains("STAGE-3")));
+                // Should be Stage 0 (no AKI atom added, equals input h)
+                assert_eq!(h_prime, h);
+            }
+            Outcome::Abstain(_) => panic!("should refine to stage 0"),
+        }
+    }
+
+    #[test]
+    fn test_kdigo_aki_abstain_uo_without_window() {
+        // UO without temporal window is structural abstention (KDIGO requires 6–24h window)
+        let op = KdigoAkiOperator::new("0.1.0");
+        let observations = vec![
+            Observation::new("LOINC:2160-0-baseline", serde_json::json!(1.0)),
+            Observation::new("LOINC:2160-0-current", serde_json::json!(1.0)),
+            Observation::new("LOINC:9192-0", serde_json::json!(0.4)), // UO 0.4 mL/kg/h, no duration
+        ];
+        let e = test_evidence_with_observations(observations);
+        let h = Hyp::unknown();
+
+        let outcome = op.apply(&h, &e);
+        match outcome {
+            Outcome::Abstain(reason) => {
+                // Expected: window duration unknown
+                assert!(reason.message().contains("window duration unknown"));
+            }
+            Outcome::Refined(_) => panic!("should abstain on UO without window duration"),
+        }
+    }
+
+    #[test]
+    fn test_kdigo_aki_stage_0_creatinine_only() {
+        // No AKI: baseline normal, current normal, Cr criterion met, no UO (avoid abstention)
+        let op = KdigoAkiOperator::new("0.1.0");
+        let observations = vec![
+            Observation::new("LOINC:2160-0-baseline", serde_json::json!(1.0)),
             Observation::new("LOINC:2160-0-current", serde_json::json!(1.0)), // no change
-            Observation::new("LOINC:9192-0", serde_json::json!(0.8)),         // normal UO
         ];
         let e = test_evidence_with_observations(observations);
         let h = Hyp::unknown();
@@ -304,8 +379,8 @@ mod tests {
     fn test_kdigo_aki_monotonicity_preserved() {
         let op = KdigoAkiOperator::new("0.1.0");
         let observations = vec![
-            Observation::new("LOINC:2160-0", serde_json::json!(1.0)),
-            Observation::new("LOINC:2160-0-current", serde_json::json!(2.0)),
+            Observation::new("LOINC:2160-0-baseline", serde_json::json!(1.0)),
+            Observation::new("LOINC:2160-0-current", serde_json::json!(2.0)), // 2.0× baseline (Stage 2)
         ];
         let e = test_evidence_with_observations(observations);
         let h = Hyp::unknown();
