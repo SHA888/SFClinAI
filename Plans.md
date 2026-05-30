@@ -92,6 +92,24 @@
 
 ---
 
+## Phase 5-BF: Code review bugfixes
+
+**Status:** All 9 bugs fixed and verified (2026-05-30)
+**Summary:** 3 operators × 3 critical bugs each = 9 total. All test suites green (193 passing).
+
+| Task | Content | Operator | Bugs Fixed | Commit | Status |
+|------|---------|----------|-----------|--------|--------|
+| 5-BF.1 | Fix KDIGO AKI operator critical bugs | KdigoAkiOperator | 6 bugs (division by zero, missing UO Stage 2, missing Cr acute-rise, no UO window validation, LOINC collision, provenance loss) | cc:done [80e0f8f] |
+| 5-BF.2 | Fix CURB-65 operator critical bugs | Curb65Operator | 2 bugs (DBP criterion lost in else-if, urea_available flag mismatch) | cc:done [70ca6d1] |
+| 5-BF.3 | Fix Wells/PE operator critical bug | WellsPeOperator | 1 bug (missing abstention on gestalt assessment) | cc:done [9261d66] |
+
+**Test Coverage:**
+- Phase 5 operators: 27 tests → 28 tests (added 1 comprehensive test)
+- Full suite: 190 tests → 193 tests (added 3 comprehensive bugfix tests)
+- All tests passing ✓
+
+---
+
 ## Phase 6: Discharge-tier upgrade (M1.6)
 
 **Goal:** Upgrade SOFA-respiratory from informal-argument to property-test tier; refresh soundness doc.
