@@ -129,6 +129,14 @@ impl WellsPeOperator {
 
 impl Operator for WellsPeOperator {
     fn apply(&self, h: &Hyp, e: &crate::Evidence) -> Outcome<Hyp, AbstainReason> {
+        // Gestalt assessment "PE as most likely diagnosis" is required
+        // This represents clinician judgment and cannot be inferred from objective findings alone
+        if !e.observations.iter().any(|obs| obs.code == "PE-LIKELY") {
+            return Outcome::Abstain(AbstainReason::InsufficientEvidence(
+                "PE gestalt assessment unavailable; clinician judgment required for Wells scoring",
+            ));
+        }
+
         // Calculate Wells score from observations
         let wells_score = Self::calculate_wells_score(&e.observations);
 
@@ -165,8 +173,9 @@ mod tests {
     #[test]
     fn test_wells_pe_unlikely_low_score() {
         let op = WellsPeOperator::new("0.1.0");
-        // Minimal criteria: just tachycardia
+        // Minimal criteria: just tachycardia; gestalt assessment says PE unlikely
         let observations = vec![
+            Observation::new("PE-LIKELY", serde_json::json!(false)), // gestalt: PE not likely
             Observation::new("HEART-RATE", serde_json::json!(120.0)), // +1.5
         ];
         let e = test_evidence_with_observations(observations);
@@ -189,6 +198,7 @@ mod tests {
         // DVT signs (+3) + tachycardia (+1.5) = 4.5, but typically PE-UNLIKELY boundary is ≤4
         // So this should be PE-LIKELY (>4)
         let observations = vec![
+            Observation::new("PE-LIKELY", serde_json::json!(true)), // gestalt: PE likely
             Observation::new("DVT-SIGNS", serde_json::json!(true)), // +3
             Observation::new("HEART-RATE", serde_json::json!(120.0)), // +1.5
         ];
@@ -258,8 +268,10 @@ mod tests {
     #[test]
     fn test_wells_pe_no_criteria() {
         let op = WellsPeOperator::new("0.1.0");
-        // No criteria: score = 0.0
-        let observations = vec![];
+        // Gestalt assessment says PE unlikely; no other criteria: score = 0.0
+        let observations = vec![
+            Observation::new("PE-LIKELY", serde_json::json!(false)), // gestalt: PE not likely
+        ];
         let e = test_evidence_with_observations(observations);
         let h = Hyp::unknown();
 
@@ -277,11 +289,12 @@ mod tests {
     fn test_wells_pe_boundary_score_4() {
         let op = WellsPeOperator::new("0.1.0");
         // Exactly 4.0: boundary case for PE-UNLIKELY
-        // DVT signs (+3) + Hemoptysis (+1) = 4.0
+        // Gestalt says unlikely; DVT signs (+3) + Hemoptysis (+1) = 4.0
         let observations = vec![
-            Observation::new("DVT-SIGNS", serde_json::json!(true)), // +3
+            Observation::new("PE-LIKELY", serde_json::json!(false)), // gestalt: PE not likely
+            Observation::new("DVT-SIGNS", serde_json::json!(true)),  // +3
             Observation::new("HEMOPTYSIS", serde_json::json!(true)), // +1
-                                                                    // Total: 4.0 exactly
+                                                                     // Total: 4.0 exactly
         ];
         let e = test_evidence_with_observations(observations);
         let h = Hyp::unknown();
@@ -316,6 +329,32 @@ mod tests {
                 );
             }
             Outcome::Abstain(_) => panic!("test setup should not abstain"),
+        }
+    }
+
+    #[test]
+    fn test_wells_pe_abstain_missing_gestalt() {
+        let op = WellsPeOperator::new("0.1.0");
+        // Objective findings (DVT, tachycardia) present, but PE gestalt assessment missing
+        // Bug: operator was refining without checking for PE-LIKELY observation
+        // Fix: abstain with InsufficientEvidence when PE-LIKELY missing
+        let observations = vec![
+            Observation::new("DVT-SIGNS", serde_json::json!(true)),
+            Observation::new("HEART-RATE", serde_json::json!(120.0)),
+        ];
+        let e = test_evidence_with_observations(observations);
+        let h = Hyp::unknown();
+
+        let outcome = op.apply(&h, &e);
+        match outcome {
+            Outcome::Abstain(reason) => {
+                assert!(matches!(reason, AbstainReason::InsufficientEvidence(_)));
+                // Verify error message mentions gestalt
+                if let AbstainReason::InsufficientEvidence(msg) = reason {
+                    assert!(msg.contains("gestalt"));
+                }
+            }
+            Outcome::Refined(_) => panic!("should abstain when PE gestalt assessment missing"),
         }
     }
 }
