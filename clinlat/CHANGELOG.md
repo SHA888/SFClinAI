@@ -11,21 +11,81 @@ Pre-1.0 minor bumps (`0.x.0`) carry breaking changes by SemVer convention.
 Tracking what is not yet on a published version. See `Plans.md` for the
 authoritative phase-by-phase task list.
 
-### Added (landed since `0.2.0-alpha.0`, not yet tagged)
+### Planned for `0.3.0` (M2 — Constrained refinement proposer)
 
-- Galois connection (Phase 3): `abstract_evidence` (α_PS) and the
+- Black-box proposer interface per DEF-PS-14 / DEF-PS-15 (INV-PS-06).
+- Soundness verification adapter wiring proposer output through safety gates.
+- Two reference proposers: deterministic lattice search + LLM-class adapter.
+- OBL-PS-05 discharge (proposer-operator separation enforced structurally).
+
+## [0.2.0] — 2026-05-31
+
+**Milestone M1: Patient substrate completion.** All eleven 4A-anchored SPEC.md
+elements (DEF-PS-01..15, INV-PS-01..06, OBL-PS-01..05) reachable from running
+code. Four operators discharged (SOFA at property-test tier; KDIGO, Wells,
+CURB-65 at informal-argument tier). 193 tests passing.
+
+### Added
+
+- **Galois connection (Phase 3):** `abstract_evidence` (α_PS) and the
   `is_consistent_with` predicate (γ_PS), property-tested for the adjunction
   laws — `e ∈ γ_PS(α_PS(e))`, `α_PS(γ_PS(h)) ⊑ h`, and monotonicity —
   discharging OBL-PS-02 at the property-test tier. (DEF-PS-05 / DEF-PS-06)
-  See `docs/obligations/obl-ps-02-adjunction.md`. Post-review test-coverage
-  cleanups (Plans.md tasks 3.5–3.7) remain before Phase 4.
+  See `docs/obligations/obl-ps-02-adjunction.md`.
 
-### Planned for `0.2.0` (M1 — Patient substrate completion)
+- **Operator-set type `Δ_PS` (Phase 4):** `OperatorSet` struct with
+  `apply_set()` method implementing propagate-forward abstention semantics
+  per DEF-PS-09. Soundness obligation OBL-PS-03 extended across the set via
+  6 property tests. See `docs/obligations/obl-ps-03-operator-set-sound.md`.
 
-- `OperatorSet` type and composition per DEF-PS-09 / OBL-PS-03 (Phase 4).
-- Three additional operators: KDIGO AKI, Wells/PE, CURB-65 (Phase 5).
-- SOFA-respiratory upgrade from informal-argument to property-test tier (Phase 6).
-- Release prep: SPEC/ARCHITECTURE cross-references, `cargo publish --dry-run` (Phase 7).
+- **Three additional operators (Phase 5):**
+  - `KdigoAkiOperator`: KDIGO 2021 AKI staging by serum creatinine
+    fold-change and urine output decline. 9 unit tests. Soundness discharge:
+    `docs/operators/kdigo_aki_soundness.md` (informal-argument tier).
+  - `WellsPeOperator`: Wells score for PE risk stratification with sequential
+    testing (D-dimer vs. CTPA). 8 unit tests. Soundness discharge:
+    `docs/operators/wells_pe_soundness.md` (informal-argument tier).
+  - `Curb65Operator`: CURB-65 CAP disposition (outpatient vs. ward vs. ICU).
+    10 unit tests. Soundness discharge: `docs/operators/curb65_soundness.md`
+    (informal-argument tier).
+
+- **SOFA-respiratory discharge-tier upgrade (Phase 6):** 17 new property-test
+  cases (46 total: 29 unit + 17 property) validating monotonicity, boundary
+  coverage, and abstention invariants. Upgraded from informal-argument to
+  property-test tier. See refreshed `docs/operators/sofa_resp_soundness.md`.
+
+- **Integration and release (Phase 7):**
+  - `clinlat/README.md` updated with three M1 operator examples (KDIGO, Wells,
+    CURB-65) and M1 status section. Cross-linked to soundness docs and SPEC.md
+    §2–8 for formal foundations.
+  - Soundness discharge documents created for KDIGO AKI and CURB-65 operators,
+    completing the set.
+  - Bidirectional traceability verified: all 18 NOTE.md §4A principles mapped
+    to SPEC.md formalizations in §8.
+
+### Fixed
+
+- **Phase 5 Code Review Bugfixes:** 9 critical operator bugs fixed post-review:
+  - KDIGO AKI (6 bugs): Division by zero on baseline Cr=0; missing UO Stage 2;
+    missing acute-rise qualifier for absolute Cr ≥4.0; no temporal window
+    validation for UO; LOINC code collision; provenance loss on UO upgrade.
+  - CURB-65 (2 bugs): DBP criterion lost in else-if when SBP normal; urea flag
+    set true even when value unparseable.
+  - Wells/PE (1 bug): Missing abstention on PE gestalt assessment (now enforces
+    clinician judgment as mandatory input).
+
+### Changed
+
+- **Version status:** Pre-release suffix `0.2.0-alpha.0` dropped. Shipping as
+  stable `0.2.0` with M1 DoD satisfied.
+
+### Verified
+
+- ✓ `cargo test --lib`: 193 tests passing (earlier: 190 baseline → +3 bugfix tests)
+- ✓ `cargo doc --no-deps`: Full docs render without warnings
+- ✓ `cargo fmt --check`: Code formatted
+- ✓ `cargo clippy -- -D warnings`: No clippy warnings
+- ✓ `cargo publish --dry-run`: Package ready for crates.io
 
 ## [0.2.0-alpha.0] — 2026-05-26
 
@@ -94,6 +154,7 @@ SOFA-respiratory worked example.
   helper.
 - `AbstainReason` enum.
 
-[Unreleased]: https://github.com/SHA888/SFClinAI/compare/clinlat-0.2.0-alpha.0...HEAD
+[Unreleased]: https://github.com/SHA888/SFClinAI/compare/clinlat-0.2.0...HEAD
+[0.2.0]: https://github.com/SHA888/SFClinAI/compare/clinlat-0.2.0-alpha.0...clinlat-0.2.0
 [0.2.0-alpha.0]: https://github.com/SHA888/SFClinAI/releases/tag/clinlat-0.2.0-alpha.0
 [0.1.0]: https://crates.io/crates/clinlat/0.1.0
