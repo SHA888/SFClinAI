@@ -112,6 +112,119 @@ Lower-level `score_from_ratio(ratio, on_mech_vent) -> Option<u8>` is also expose
 as a standalone numeric helper (no Evidence/Provenance plumbing) for callers that
 just need the SOFA mapping in isolation.
 
+### KDIGO AKI Staging Operator
+
+```rust
+use clinlat::{Hyp, Operator, Outcome, KdigoAkiOperator};
+# use std::collections::BTreeMap;
+# use chrono::Utc;
+# use clinlat::{Evidence, Observation, Provenance, ProvenanceOrigin, Ver};
+# let evidence = Evidence::new(
+#     vec![
+#         Observation::new("LOINC:2160-0-baseline", serde_json::json!(1.2)),  // baseline Cr
+#         Observation::new("LOINC:2160-0-current", serde_json::json!(2.8)),   // current Cr
+#     ],
+#     Provenance::new(
+#         ProvenanceOrigin::new("lab_api", "LOINC", "2160-0"),
+#         Utc::now(),
+#         Ver::new("clinlat", "lab_ingest", "0.1.0"),
+#         BTreeMap::new(),
+#     ),
+# );
+
+let operator = KdigoAkiOperator::new("0.2.0");
+let outcome = operator.apply(&Hyp::unknown(), &evidence);
+
+match outcome {
+    Outcome::Refined(h) => {
+        // Refined to KDIGO AKI Stage 2 (creatinine 2.3x baseline)
+        println!("AKI staging: {:?}", h);
+    }
+    Outcome::Abstain(reason) => println!("Cannot stage: {:?}", reason),
+}
+```
+
+The KDIGO AKI operator stratifies kidney injury severity by serum creatinine fold-change and urine output decline, per the Kidney Disease: Improving Global Outcomes 2021 guideline. Stage assignments (0–3) drive admission and dialysis decisions in critical care.
+
+See [`clinlat/docs/operators/kdigo_aki_soundness.md`](docs/operators/kdigo_aki_soundness.md) for soundness argument.
+
+### Wells PE Risk Stratification Operator
+
+```rust
+use clinlat::{Hyp, Operator, Outcome, WellsPeOperator};
+# use std::collections::BTreeMap;
+# use chrono::Utc;
+# use clinlat::{Evidence, Observation, Provenance, ProvenanceOrigin, Ver};
+# let evidence = Evidence::new(
+#     vec![
+#         Observation::new("PE-LIKELY", serde_json::json!(true)),      // gestalt
+#         Observation::new("DVT-SIGNS", serde_json::json!(true)),      // +3 points
+#         Observation::new("HEART-RATE", serde_json::json!(115.0)),    // +1.5 points
+#     ],
+#     Provenance::new(
+#         ProvenanceOrigin::new("manual_entry", "clinician", "wells"),
+#         Utc::now(),
+#         Ver::new("clinlat", "clinical_assessment", "0.1.0"),
+#         BTreeMap::new(),
+#     ),
+# );
+
+let operator = WellsPeOperator::new("0.2.0");
+let outcome = operator.apply(&Hyp::unknown(), &evidence);
+
+match outcome {
+    Outcome::Refined(h) => {
+        // Refined to PE-LIKELY (score 4.5 > 4.0 threshold)
+        // Next step: CTPA imaging indicated
+        println!("PE risk: {:?}", h);
+    }
+    Outcome::Abstain(reason) => println!("Cannot score: {:?}", reason),
+}
+```
+
+The Wells PE operator implements cumulative clinical scoring for pulmonary embolism risk, per Wells et al. (1997/2006). The gestalt assessment ("is PE your leading diagnosis?") is mandatory—the operator enforces clinician judgment as a core input, not an optional feature. Scores ≤4 → D-dimer testing (rule-out); scores >4 → CTPA imaging (rule-in).
+
+See [`clinlat/docs/operators/wells_pe_soundness.md`](docs/operators/wells_pe_soundness.md) for soundness argument.
+
+### CURB-65 CAP Disposition Operator
+
+```rust
+use clinlat::{Hyp, Operator, Outcome, Curb65Operator};
+# use std::collections::BTreeMap;
+# use chrono::Utc;
+# use clinlat::{Evidence, Observation, Provenance, ProvenanceOrigin, Ver};
+# let evidence = Evidence::new(
+#     vec![
+#         Observation::new("CONFUSION", serde_json::json!(false)),      // no confusion
+#         Observation::new("UREA", serde_json::json!(8.5)),             // >7 mmol/L → +1
+#         Observation::new("RESP-RATE", serde_json::json!(32.0)),       // ≥30 → +1
+#         Observation::new("SBP", serde_json::json!(92.0)),             // not <90
+#         Observation::new("AGE", serde_json::json!(71.0)),             // ≥65 → +1
+#     ],
+#     Provenance::new(
+#         ProvenanceOrigin::new("ward_vitals", "manual", "cap_assessment"),
+#         Utc::now(),
+#         Ver::new("clinlat", "cap_scoring", "0.1.0"),
+#         BTreeMap::new(),
+#     ),
+# );
+
+let operator = Curb65Operator::new("0.2.0");
+let outcome = operator.apply(&Hyp::unknown(), &evidence);
+
+match outcome {
+    Outcome::Refined(h) => {
+        // Refined to WARD-ADMISSION (score 3)
+        println!("CAP disposition: {:?}", h);
+    }
+    Outcome::Abstain(reason) => println!("Cannot score: {:?}", reason),
+}
+```
+
+The CURB-65 operator stratifies community-acquired pneumonia (CAP) severity for disposition decisions, per the British Thoracic Society and IDSA/ATS guidelines. Scores 0–1 → outpatient; score 2 → ward admission; scores 3–5 → ICU evaluation with possible critical care.
+
+See [`clinlat/docs/operators/curb65_soundness.md`](docs/operators/curb65_soundness.md) for soundness argument.
+
 ## Architecture
 
 ### Hypothesis Lattice
@@ -169,22 +282,24 @@ See [`clinlat/docs/operators/sofa_resp_soundness.md`](docs/operators/sofa_resp_s
 
 ## v0.2.0-alpha Status
 
-What has shipped in this pre-release:
+**M1 Milestone (Patient substrate completion): Phases 0–6 complete.**
+
+What has shipped:
 
 - **`Atom`** (Phase 1): replaces `&'static str` AtomId with `{ system, code, preferred_term, version }`. Resolved through four `OntologyAdapter` implementations: SNOMED CT, RxNorm, LOINC, ICD-11.
 - **`Evidence`** (Phase 2): typed `{ observations: Vec<Observation>, provenance: Provenance }` carrying clinical observations and audit-trail provenance (DEF-PS-12, DEF-PS-13).
 - **`Provenance`** (Phase 2): typed carrier with origin, ISO 8601 timestamp, operator version, metadata, and optional `derives_from` hashes (DEF-MP-14, OBL-PS-04). JSON serializable with optional gzip compression.
 - **`SofaRespOperator`** (Phase 2): full `Operator::apply()` implementation with version-respecting derivation chain enforcement — the operator abstains rather than silently process evidence whose provenance version does not match (INV-PS-05).
-- **Galois connection** (Phase 3): abstraction `abstract_evidence` (α_PS) and the concretization predicate `is_consistent_with` (γ_PS) property-tested for the adjunction laws — `e ∈ γ_PS(α_PS(e))`, `α_PS(γ_PS(h)) ⊑ h`, and monotonicity — discharging OBL-PS-02 at the property-test tier. See [`docs/obligations/obl-ps-02-adjunction.md`](docs/obligations/obl-ps-02-adjunction.md). (A few post-review test-coverage cleanups, Plans.md tasks 3.5–3.7, remain before Phase 4.)
+- **Galois connection** (Phase 3): abstraction `abstract_evidence` (α_PS) and the concretization predicate `is_consistent_with` (γ_PS) property-tested for the adjunction laws — `e ∈ γ_PS(α_PS(e))`, `α_PS(γ_PS(h)) ⊑ h`, and monotonicity — discharging OBL-PS-02 at the property-test tier. See [`docs/obligations/obl-ps-02-adjunction.md`](docs/obligations/obl-ps-02-adjunction.md).
+- **`OperatorSet`** type and composition (Phase 4): formalized per DEF-PS-09 / OBL-PS-03 with propagate-forward semantics for abstention handling. See [`docs/obligations/obl-ps-03-operator-set-sound.md`](docs/obligations/obl-ps-03-operator-set-sound.md).
+- **Three additional operators** (Phase 5): `KdigoAkiOperator`, `WellsPeOperator`, `Curb65Operator` with 27 unit tests and soundness discharge documents at informal-argument tier. All critical code-review bugs (9 total) fixed and verified.
+- **SOFA-respiratory upgrade** (Phase 6): from informal-argument tier to property-test tier with 17 new property-test cases (46 total: 29 unit + 17 property). See [`docs/operators/sofa_resp_soundness.md`](docs/operators/sofa_resp_soundness.md).
 
-What remains for the v0.2.0 release (Phases 4–7 of Plans.md):
+**Currently** (Phase 7): Release prep — README/SPEC cross-references, full CI verification, publish dry-run.
 
-- **`OperatorSet`** type and composition formalized per DEF-PS-09 / OBL-PS-03 (Phase 4).
-- **Three additional operators**: KDIGO AKI, Wells/PE, CURB-65 (Phase 5).
-- **SOFA-respiratory upgrade** from informal-argument tier to property-test tier (Phase 6).
-- **Release prep**: README/SPEC cross-references, full CI green, publish dry-run (Phase 7).
+Test coverage: **193 tests passing** (all operators, all phases).
 
-Pre-release versioning (`0.2.0-alpha.N`) is used while these phases land; the suffix is dropped on the cut to `0.2.0`.
+Pre-release versioning (`0.2.0-alpha.N`) is used while Phase 7 lands; the suffix is dropped on the cut to `0.2.0`.
 
 ## References
 
