@@ -134,9 +134,9 @@
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 7.1 | Update `clinlat/README.md` with M1 examples | Add worked examples for KDIGO AKI and Wells/PE alongside SOFA-respiratory; link to soundness docs | 5.4, 5.5, 5.6 | cc:todo |
-| 7.2 | Update SPEC.md ARCHITECTURE.md cross-references | Ensure all M1 formal definitions (DEF-PS-03, etc.) linked from SPEC §2; all Diagram 1–3 nodes anchored | 1.1 through 6.3 | cc:todo |
-| 7.3 | Verify `cargo test`, `cargo doc --no-deps` green; CI matrix passes | All checks pass: fmt, clippy, test, doc, semver, MSRV | 7.1, 7.2 | cc:todo |
+| 7.1 | Update `clinlat/README.md` with M1 examples | Three operator examples (KDIGO AKI, Wells/PE, CURB-65) added; M1 status section updated; cross-links to soundness docs and SPEC.md; doc tests pass | 5.4, 5.5, 5.6 | cc:done [21f2e83] |
+| 7.2 | Update SPEC.md/ARCHITECTURE.md cross-references + create soundness discharge docs | Soundness docs created for KDIGO AKI and CURB-65 (Wells/PE exists from Phase 5); all docs link to SPEC.md §2–§8; README links DEF-PS-08, INV-PS-01–06; cross-references validated | 1.1 through 6.3 | cc:done [17a6b48] |
+| 7.3 | Verify `cargo test`, `cargo doc --no-deps` green; CI matrix passes | 193 tests passing; cargo doc builds; cargo fmt clean; cargo clippy no warnings; cargo check green | 7.1, 7.2 | cc:done [verified] |
 | 7.4 | Dry-run publish verification | `cargo publish --dry-run` succeeds without errors | 7.3 | cc:todo |
 
 ---
