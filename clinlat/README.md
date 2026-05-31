@@ -272,13 +272,22 @@ Per Sepsis-3, scores 3 and 4 are only valid for intubated patients; the operator
 
 ## Soundness
 
-Each operator carries a soundness argument establishing three properties:
+Each operator carries a soundness argument establishing three properties per **DEF-PS-08** (Soundness of a deduction operator):
 
-1. **Refinement monotonicity**: If h₁ ⊑ h₂, operator output on h₁ refines that on h₂.
+1. **Refinement monotonicity (INV-PS-03)**: If h₁ ⊑ h₂, operator output on h₁ refines that on h₂.
 2. **No spurious refinement**: Output never exceeds what the evidence justifies.
-3. **Abstention purity**: Abstention is structural, not error handling.
+3. **Abstention purity (INV-PS-04)**: Abstention is structural, not error handling.
 
-See [`clinlat/docs/operators/sofa_resp_soundness.md`](docs/operators/sofa_resp_soundness.md) for the SOFA-3 argument.
+Soundness arguments are provided for all M1 operators:
+
+- **SOFA-3 respiratory:** [`docs/operators/sofa_resp_soundness.md`](docs/operators/sofa_resp_soundness.md) (property-test tier: 46 tests)
+- **KDIGO AKI:** [`docs/operators/kdigo_aki_soundness.md`](docs/operators/kdigo_aki_soundness.md) (informal-argument tier)
+- **Wells PE:** [`docs/operators/wells_pe_soundness.md`](docs/operators/wells_pe_soundness.md) (informal-argument tier)
+- **CURB-65 CAP:** [`docs/operators/curb65_soundness.md`](docs/operators/curb65_soundness.md) (informal-argument tier)
+
+All soundness arguments discharge **OBL-PS-03** (Operator set soundness) and satisfy **INV-PS-01**–**INV-PS-06** (patient-substrate invariants).
+
+**Formal reference:** See [`SPEC.md` §2 (Patient-state substrate)](../SPEC.md) and [`SPEC.md` §8 (Bidirectional traceability)](../SPEC.md) for the complete formalization of operator soundness and the mapping from principles (NOTE.md §4A) to formal definitions.
 
 ## v0.2.0-alpha Status
 
