@@ -1,0 +1,159 @@
+# M1 Archive — clinlat substrate kernel (`clinlat-v0.1.0` / v0.2.0)
+
+**Status:** Archived 2026-06-01 — M1 complete, shipped 2026-05-31.
+**Scope:** Detailed task tables for completed M1 phases, moved out of Plans.md to keep the active plan focused on M2. See Plans.md for stub pointers and the M1 Definition of Done.
+
+---
+
+## Phase 0: Architectural decisions and design docs
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 0.1 | **D1 Decision: Provenance encoding** — decide CBOR vs. JSON vs. Merkle DAG vs. hybrid for `Provenance` carrier type. Criteria: serialization overhead, query-ability, audit trail fidelity per OBL-PS-04. Document trade-offs in `docs/design/DESIGN-D1-provenance.md` | Decision document with rationale and implementation sketch; consensus in team/advisor review if applicable | - | cc:done [7fa0c69] |
+| 0.2 | **D2 Decision: Ontology adapter caching strategy** — decide in-memory cache vs. Redis vs. offline snapshot vs. hybrid for SNOMED CT, RxNorm, LOINC, ICD-11 access. Constraints per M1.1: DEF-PS-03/04, INV-PS-01. Document in `docs/design/DESIGN-D2-ontology.md` | Decision document with caching topology sketch, API contract for OntologyAdapter trait | 0.1 | cc:done [a621f2f] |
+| 0.3 | Write **spec SSOT for M1 provenance contract** (`docs/spec/M1-provenance-spec.md`) — formalizes the Provenance type signature, serialization, deserialization, query interface; anchors to DEF-MP-14, DEF-PS-12, DEF-PS-13, INV-PS-05, OBL-PS-04 | Spec document with type signatures, invariant proofs, example encoded/decoded Provenance values | 0.1 | cc:done [139ecfa] |
+
+---
+
+## Phase 1: Ontology infrastructure (M1.1)
+
+**Goal:** Replace `&'static str` AtomId with adapters for SNOMED CT, RxNorm, LOINC, ICD-11. Discharge DEF-PS-03, DEF-PS-04, INV-PS-01, OBL-PS-01. Diagram 1's `OB` node becomes runnable.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 1.1 | Define `OntologyAdapter` trait signature | `pub trait OntologyAdapter { fn resolve_atom(&self, code: &str, system: OntologySystem) -> Result<Atom, OntologyError>; fn validate_compatibility(&self, atom1: &Atom, atom2: &Atom) -> bool; }` with doc anchoring to DEF-PS-03 | 0.2 | cc:done [97b0304] |
+| 1.2 | Implement `SnomedAdapter` — thin client for SNOMED CT API/snapshot (per M1.1 scope) | Adapter impl with ≥3 example codes; `cargo test` passes; doc refs SNOMED CT Edition reference | 1.1 [tdd:required] | cc:done [0b0648b] |
+| 1.3 | Implement `RxNormAdapter` — thin client for RxNorm (drugs, strengths) | Adapter impl with ≥3 example drug codes; `cargo test` passes | 1.1 [tdd:required] | cc:done [8e085f0] |
+| 1.4 | Implement `LoincAdapter` — thin client for LOINC (lab tests, vital signs) | Adapter impl with ≥3 example LOINC codes; `cargo test` passes | 1.1 [tdd:required] | cc:done [dad0fb0] |
+| 1.5 | Implement `Icd11Adapter` — thin client for ICD-11 (diagnoses, procedure codes) | Adapter impl with ≥3 example ICD-11 codes; `cargo test` passes | 1.1 [tdd:required] | cc:done [68f6fc3] |
+| 1.6 | Define `Atom` type as replacement for `&'static str` AtomId | `pub struct Atom { system: OntologySystem, code: String, preferred_term: String, version: String }` with PartialEq, Hash, Clone; doc names DEF-PS-03 | 1.1 | cc:done [1.2–1.5 impl] |
+| 1.7 | Update `Hyp` struct to use `Atom` instead of `&'static str`; preserve refinement order semantics | `Hyp` variants now carry `Atom` payloads; PartialOrd / compatibility / meet logic unchanged; all existing tests pass | 1.2, 1.3, 1.4, 1.5, 1.6 [tdd:required] | cc:done [8d7593c] |
+| 1.8 | Write INV-PS-01 proof (ontology closure) — show that all atoms in a Hyp are reachable from resolving the registered OntologyAdapter set | Informal-argument doc `clinlat/docs/invariants/inv-ps-01-closure.md`; cite adapters as correctness premises | 1.7 | cc:done [204f375] |
+
+---
+
+## Phase 2: Provenance carrier (M1.2)
+
+**Goal:** Replace `()` stub with a typed provenance carrier supporting DEF-MP-14, DEF-PS-12, DEF-PS-13, INV-PS-05, OBL-PS-04. Encoding choice (CBOR vs. JSON vs. Merkle DAG) decided in DESIGN-D1.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 2.1 | Implement `Provenance` type per DESIGN-D1 and spec SSOT (0.3) | `pub struct Provenance { origin: ProvenanceOrigin, timestamp: DateTime<Utc>, version: Ver, metadata: BTreeMap<String, Value>, derives_from: Option }` with JSON serialization/deserialization and gzip compression | 0.1, 0.3 | cc:done [b2246f8] |
+| 2.2 | Update `Evidence` struct to carry typed `Provenance` instead of `()` | `pub struct Evidence { observations: Vec<Observation>, provenance: Provenance }`; Evidence::new(observations, provenance) constructor with JSON serialization | 2.1 | cc:done [fd29653] |
+| 2.3 | Update `SofaRespOperator.apply()` to extract and validate provenance per OBL-PS-04 | Implementation validates `provenance.version` matches operator version; emits abstention if mismatch; property test: version invariant held | 2.1, 2.2 [tdd:required] | cc:done [691ef77] |
+| 2.4 | Write OBL-PS-04 discharge proof (provenance audit-trail fidelity) — show that operator output provenance carries source, timestamp, version; audit queries answerable | Informal-argument doc `clinlat/docs/obligations/obl-ps-04-provenance-audit.md`; worked example: trace SOFA-respiratory evidence back to source | 2.3 | cc:done [c02eb9f] |
+
+---
+
+## Phase 3: Galois connection and abstraction (M1.3)
+
+**Goal:** Implement `α_PS`, `γ_PS` per DEF-PS-05/06; discharge OBL-PS-02 (adjunction laws) at property-test tier.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 3.1 | Define abstraction function `α_PS: Evidence → Hyp` | Signature `fn abstract_evidence(e: &Evidence) -> Hyp` mapping observed facts to patient hypotheses; doc anchors to DEF-PS-05 | 0.3 | cc:done [4a6cbd8] |
+| 3.2 | Define concretization function `γ_PS: Hyp → Set<Evidence>` | Signature `fn concretize_hypothesis(h: &Hyp) -> Set<Evidence>` (represented as predicate `fn is_consistent_with(&Hyp, &Evidence) -> bool`); doc anchors to DEF-PS-06 | 3.1 | cc:done [a57fb6f] |
+| 3.3 | Implement adjunction property tests for α_PS and γ_PS | Property tests verify: (1) `e ∈ γ_PS(α_PS(e))` (lower adjoint), (2) `α_PS(γ_PS(h)) ⊑ h` (upper adjoint), (3) monotonicity; property test framework (proptest); ≥10 generated test cases | 3.1, 3.2 [tdd:required] | cc:done [50a6d5a] |
+| 3.4 | Write OBL-PS-02 discharge proof (adjunction sound) — show that the adjoint laws hold unconditionally | Property-test tier doc `clinlat/docs/obligations/obl-ps-02-adjunction.md` with test suite output | 3.3 | cc:done [d2295ea] |
+| 3.5 | **Post-review cleanup (obs-1):** Fold duplicate `prop_consistency_unknown_reflexive` into `prop_unknown_consistent_with_all` (both currently assert `is_consistent_with(&Hyp::unknown(), &e)` over `evidence_strategy()`) — or differentiate inputs so each test covers a distinct subspace (e.g., one over `evidence_strategy`, one over empty Evidence) | One assertion per distinct property in `proptest_galois_laws`; `cargo test --lib proptest_galois_laws` still green | 3.4 | cc:done [8e7e769] |
+| 3.6 | **Post-review cleanup (obs-2):** Strengthen `prop_gamma_antitone_in_hyp` to also cover hand-crafted `(h_general, h_specific)` pairs where `h_general ⊑ h_specific` by atom-set inclusion (currently only the α-derived special case where both hyps come from related evidence is tested) | New proptest strategy generating a comparable hyp pair via atom-set extension; ≥256 cases pass; doc `clinlat/docs/obligations/obl-ps-02-adjunction.md` updated to reflect broader coverage | 3.4 | cc:done [d4ca9c2] |
+| 3.7 | **Post-review decision (obs-3):** Reconcile `Hyp::compat` with the refined `Hyp::PartialOrd` (atom-set inclusion). After F6, INV-PS-01 fails on `h₁ = {a,b}`, `h₂ = Unknown`, `h₃ = {a,c}`: `h₁ ⊑ h₂` AND `compat(h₂, h₃)` but `¬compat(h₁, h₃)`. Decide: (a) widen `compat` to "comparable in `PartialOrd` OR one is Unknown OR shared atom-prefix"; (b) keep `compat` strict and formally document the INV-PS-01 gap in SPEC.md §7 as an open question; (c) introduce a new `compat_refined` predicate consistent with the new order while preserving `compat` for v0.1 backwards-compatibility. **Must be resolved before Phase 4 begins.** | `clinlat/docs/invariants/inv-ps-01-closure.md` updated with the chosen reconciliation; if option (a) or (c): `compat` (or `compat_refined`) implementation + tests landed; if option (b): SPEC.md §7 open question entry created. INV-PS-01 either holds or is explicitly documented as deferred | 3.4 | cc:done [ace1267] |
+
+---
+
+## Phase 4: Operator-set formalization (M1.4)
+
+**Goal:** Formalize the operator collection per DEF-PS-09; extend soundness obligation OBL-PS-03 across the set.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 4.1 | Define `OperatorSet` type (Δ_PS) | `pub struct OperatorSet { operators: Vec<Box<dyn Operator>>, metadata: BTreeMap<String, OperatorMetadata> }` with builder methods; 8 unit tests covering empty set, registration, apply_set with noop/abstain | 1.7, 2.2, 3.7 | cc:done [9793260] |
+| 4.2 | Implement OperatorSet::apply_set() method with propagate-forward semantics | Method applies all registered operators in sequence; abstentions recorded but don't silence next; SetOutcome carries result hypothesis and (name, reason) pairs; 3 additional unit tests for mixed chains | 4.1 [tdd:required] | cc:done [2066118] |
+| 4.3 | Property-test OperatorSet soundness (OBL-PS-03 across the set) | Three fixture operators (NoopOperator, ConstRefineOperator, AlwaysAbstainOperator); 6 property tests verify composition preserves refinement, abstention propagates forward, empty set identity, all-abstain preserves input, noop chains are identity, multi-operator chains refine | 4.2 [tdd:required] | cc:done [b3b5925] |
+| 4.4 | Write OBL-PS-03 discharge proof (operator-set soundness) — property-test tier | Doc `clinlat/docs/obligations/obl-ps-03-operator-set-sound.md` with lifting lemma proof (induction on chain length), implementation notes, 6 test discharges, worked example (Sofa+Kdigo composition), limitations, verification checklist | 4.3 | cc:done [f222ae1] |
+
+---
+
+## Phase 5: Additional operators (M1.5)
+
+**Goal:** Three additional operators matching NOTE.md §7E worked examples, each with informal-argument discharge plus property tests (KDIGO AKI, Wells/PE, CURB-65).
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 5.1 | **KDIGO AKI Staging Operator** — encode KDIGO criteria (creatinine fold-change, UO decline) | `KdigoAkiOperator` impl per Kidney Disease: Improving Global Outcomes guideline; handles stages 0–3; 7 unit tests validate all stage transitions and abstention logic; 156 tests passing | 1.7, 2.2 | cc:done [ec20fc1] |
+| 5.2 | **Wells Score Operator** — PE risk stratification with sequential testing | `WellsPeOperator` impl: encodes 7 clinical criteria with cumulative scoring; outputs PE-UNLIKELY (≤4) or PE-LIKELY (>4); 7 unit tests cover all score boundaries; 163 tests passing | 1.7, 2.2 | cc:done [6edbea4] |
+| 5.3 | **CURB-65 Operator** — CAP disposition (outpatient vs. admission) | `Curb65Operator` impl per BTS CAP guideline; inputs: confusion, urea/BUN, RR, BP, age ≥65; outputs: OUTPATIENT/WARD-ADMISSION/ICU-EVALUATION; 8 unit tests validate all disposition categories; 171 tests passing | 1.7, 2.2 | cc:done [6528d03] |
+| 5.4 | Write soundness argument for KDIGO AKI operator | Doc `clinlat/docs/operators/kdigo_aki_soundness.md` (informal-argument tier); cites KDIGO 2021 guideline; proves DEF-PS-08 three clauses; discharges 7 unit tests; identifies limitations (window duration, confounders, baseline provenance, temporal evolution) | 5.1 | cc:done [d88df01] |
+| 5.5 | Write soundness argument for Wells PE operator | Doc `clinlat/docs/operators/wells_pe_soundness.md` (informal-argument tier); cites Wells et al. 1997/2006; proves cumulative scoring and sequential testing soundness; discharges 7 unit tests; documents sequential testing strategy and limitations | 5.2 | cc:done [d88df01] |
+| 5.6 | Write soundness argument for CURB-65 operator | Doc `clinlat/docs/operators/curb65_soundness.md` (informal-argument tier); cites BTS CAP and IDSA/ATS guidelines; proves binary scoring and disposition soundness; discharges 8 unit tests; documents IDSA/ATS integration gap and future work | 5.3 | cc:done [d88df01] |
+
+---
+
+## Phase 5-BF: Code review bugfixes
+
+**Status:** All 9 bugs fixed and verified (2026-05-30)
+**Summary:** 3 operators × 3 critical bugs each = 9 total. All test suites green (193 passing).
+
+| Task | Content | Operator | Bugs Fixed | Commit | Status |
+|------|---------|----------|-----------|--------|--------|
+| 5-BF.1 | Fix KDIGO AKI operator critical bugs | KdigoAkiOperator | 6 bugs (division by zero, missing UO Stage 2, missing Cr acute-rise, no UO window validation, LOINC collision, provenance loss) | cc:done [80e0f8f] |
+| 5-BF.2 | Fix CURB-65 operator critical bugs | Curb65Operator | 2 bugs (DBP criterion lost in else-if, urea_available flag mismatch) | cc:done [70ca6d1] |
+| 5-BF.3 | Fix Wells/PE operator critical bug | WellsPeOperator | 1 bug (missing abstention on gestalt assessment) | cc:done [9261d66] |
+
+**Test Coverage:**
+- Phase 5 operators: 27 tests → 28 tests (added 1 comprehensive test)
+- Full suite: 190 tests → 193 tests (added 3 comprehensive bugfix tests)
+- All tests passing ✓
+
+---
+
+## Phase 6: Discharge-tier upgrade (M1.6)
+
+**Goal:** Upgrade SOFA-respiratory from informal-argument to property-test tier; refresh soundness doc.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 6.1 | Refactor `SofaRespOperator` to use new Atom/Provenance infrastructure (Phase 1–2) | Operator already uses Phase 1's Atom and Phase 2's Provenance; all 29 v0.1.0 unit tests still pass; confirmed with `cargo test --lib sofa` | 1.7, 2.3 | cc:done [5a6e322] |
+| 6.2 | Expand SOFA-respiratory test suite to property-test tier | ≥17 new property-test-like functions added to sofa.rs (via loops covering ranges); verify: (1) monotonicity (46 total tests: 29 unit + 17 property), (2) threshold boundaries (all 6 bands), (3) abstention on invalid input (version, FiO2, preconditions); all 46 tests passing | 6.1 [tdd:required] | cc:done [5a6e322] |
+| 6.3 | Refresh `clinlat/docs/operators/sofa_resp_soundness.md` | Doc created: Status upgraded from "informal-argument tier" to "property-test tier"; full soundness proof per DEF-PS-08; clinical justification from Vincent 1996 and Singer 2016 Sepsis-3; all 46 tests enumerated (29 unit + 17 property) with verification checklist | 6.2 | cc:done [5a6e322] |
+
+---
+
+## Phase 6-BF: Bugfix
+
+See `docs/archives/ARCHIVE-6BF.md` for the detailed bugfix history and commits. Summary: 11 bugs fixed and verified (2026-05-29) — 5 HIGH, 3 MEDIUM, 3 LOW; 129 tests passing, all invariants satisfied.
+
+---
+
+## Phase 7: Integration and release
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 7.1 | Update `clinlat/README.md` with M1 examples | Three operator examples (KDIGO AKI, Wells/PE, CURB-65) added; M1 status section updated; cross-links to soundness docs and SPEC.md; doc tests pass | 5.4, 5.5, 5.6 | cc:done [21f2e83] |
+| 7.2 | Update SPEC.md/ARCHITECTURE.md cross-references + create soundness discharge docs | Soundness docs created for KDIGO AKI and CURB-65 (Wells/PE exists from Phase 5); all docs link to SPEC.md §2–§8; README links DEF-PS-08, INV-PS-01–06; cross-references validated | 1.1 through 6.3 | cc:done [17a6b48] |
+| 7.3 | Verify `cargo test`, `cargo doc --no-deps` green; CI matrix passes | 193 tests passing; cargo doc builds; cargo fmt clean; cargo clippy no warnings; cargo check green | 7.1, 7.2 | cc:done [verified] |
+| 7.4 | Dry-run publish verification | `cargo publish --dry-run` succeeds without errors; crate compiles and is ready for crates.io | 7.3 | cc:done [verified] |
+
+---
+
+## Definition of Done for M1 (met — shipped 2026-05-31)
+
+✓ All eleven 4A-anchored SPEC.md elements (DEF-PS-01..15, INV-PS-01..06, OBL-PS-01..05) reachable from running code
+✓ Four operators discharged at property-test tier minimum (SOFA-respiratory, KDIGO AKI, Wells/PE, CURB-65)
+✓ `clinlat` crate compiles, tests pass, docs render
+✓ Ontology adapters (SNOMED, RxNorm, LOINC, ICD-11) integrated; Atom replaces `&'static str` throughout
+✓ Provenance carrier typed per OBL-PS-04; audit-trail fidelity demonstrated
+✓ Galois connection (α_PS, γ_PS) property-tested per OBL-PS-02
+✓ Operator-set type and composition formalized per DEF-PS-09, OBL-PS-03
+
+---
+
+## Explicitly out of scope for M1 (historical backlog note)
+
+At M1 close, the following were deferred to later milestones. They are now tracked as first-class milestones in TODO.md (M2–M6):
+
+- Proposer (constrained refinement suggester) — DEF-PS-14 → M2 (active)
+- Institutional substrate (§3) — M3
+- Interaction layer (§4C) — M4
+- Temporal evolution (§5) — M5
+- Cross-cutting concerns (§6) — M6
