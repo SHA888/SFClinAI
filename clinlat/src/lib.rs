@@ -99,6 +99,7 @@ pub mod ontology;
 pub mod operator;
 pub mod operator_set;
 pub mod outcome;
+pub mod proposer;
 pub mod provenance;
 pub mod sofa;
 pub mod version;
@@ -115,6 +116,7 @@ pub use ontology::{
 pub use operator::{Evidence, Observation, Operator, abstract_evidence, is_consistent_with};
 pub use operator_set::{OperatorMetadata, OperatorSet, SetOutcome};
 pub use outcome::Outcome;
+pub use proposer::{CandidateSet, RefinementProposer};
 pub use provenance::{Provenance, ProvenanceOrigin};
 pub use sofa::{SofaRespEvidence, SofaRespHypothesis, SofaRespOperator};
 pub use version::Ver;
