@@ -317,6 +317,102 @@ pub trait RefinementProposer: Send + Sync {
     fn propose(&self, h: &Hyp, e: &Evidence) -> CandidateSet;
 }
 
+/// Result of filtering proposer output through constraint validation.
+///
+/// Returned by `propose_and_filter` to track valid candidates, filtered count, and errors.
+#[derive(Clone, Debug)]
+pub struct FilterResult {
+    /// Candidates that passed the ontology-bounded and operator-reachable checks
+    pub valid_candidates: CandidateSet,
+    /// Number of candidates rejected by filtering
+    pub filtered_out_count: usize,
+    /// Structured errors from rejected candidates (for audit trail / debugging)
+    pub filter_errors: Vec<ConstraintError>,
+}
+
+impl FilterResult {
+    /// Create a new filter result.
+    pub fn new(
+        valid_candidates: CandidateSet,
+        filtered_out_count: usize,
+        filter_errors: Vec<ConstraintError>,
+    ) -> Self {
+        Self {
+            valid_candidates,
+            filtered_out_count,
+            filter_errors,
+        }
+    }
+
+    /// Check if all candidates passed filtering (no errors).
+    pub fn all_passed(&self) -> bool {
+        self.filter_errors.is_empty()
+    }
+
+    /// Check if any candidates passed filtering.
+    pub fn has_valid_candidates(&self) -> bool {
+        !self.valid_candidates.is_empty()
+    }
+}
+
+/// Adapter that calls a proposer and filters output through constraint validation.
+///
+/// This is the implementation of the **output-side gate** in Diagram 3 (M2.1).
+/// It enforces DEF-PS-15 codomain constraints on every candidate returned by a proposer,
+/// preventing invalid hypotheses from reaching the deduction operators (soundness gate).
+///
+/// # Semantics
+///
+/// Given a proposer `π`, hypothesis `h`, and evidence `e`:
+///
+/// 1. Call `π(h, e)` to get a set of candidates.
+/// 2. For each candidate in the set:
+///    - Validate it against `ProposerConstraint` (ontology-bounded + operator-reachable).
+///    - If valid, add to result set.
+///    - If invalid, record error and increment filtered count.
+/// 3. Return `FilterResult` with valid set, filtered count, and error list.
+///
+/// # Side effects
+///
+/// Logs each filtering decision for audit trail (OBL-PS-04). Logs are structured:
+/// - `valid: <hash>` for candidates that pass.
+/// - `invalid: <hash> due to <clause>` for candidates that fail.
+pub fn propose_and_filter(
+    proposer: &dyn RefinementProposer,
+    h: &Hyp,
+    e: &Evidence,
+) -> FilterResult {
+    // Validate input hypothesis before calling proposer (input-side gate per M2.1)
+    let constraint = ProposerConstraint::new();
+    if let Err(input_error) = constraint.validate_input(h, e) {
+        // Input is invalid: return empty result with error (proposer never called)
+        return FilterResult::new(CandidateSet::new(), 0, vec![input_error]);
+    }
+
+    // Call proposer to get candidates
+    let candidates = proposer.propose(h, e);
+    let total_count = candidates.len();
+
+    // Filter candidates through constraint validator
+    let mut valid_candidates = CandidateSet::new();
+    let mut filter_errors = Vec::new();
+
+    for candidate in candidates.iter() {
+        match constraint.validate(candidate, h, e) {
+            Ok(()) => {
+                valid_candidates.insert(candidate.clone());
+            }
+            Err(err) => {
+                filter_errors.push(err);
+            }
+        }
+    }
+
+    let filtered_out_count = total_count - valid_candidates.len();
+
+    FilterResult::new(valid_candidates, filtered_out_count, filter_errors)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,11 +421,23 @@ mod tests {
     use chrono::Utc;
     use std::collections::BTreeMap;
 
-    struct TestProposer;
+    struct TestProposer {
+        candidates: Vec<Hyp>,
+    }
+
+    impl TestProposer {
+        fn new(candidates: Vec<Hyp>) -> Self {
+            Self { candidates }
+        }
+
+        fn empty() -> Self {
+            Self { candidates: vec![] }
+        }
+    }
 
     impl RefinementProposer for TestProposer {
         fn propose(&self, _h: &Hyp, _e: &Evidence) -> CandidateSet {
-            HashSet::new()
+            self.candidates.iter().cloned().collect()
         }
     }
 
@@ -346,12 +454,12 @@ mod tests {
 
     #[test]
     fn test_refinement_proposer_trait_compiles() {
-        let _proposer: Box<dyn RefinementProposer> = Box::new(TestProposer);
+        let _proposer: Box<dyn RefinementProposer> = Box::new(TestProposer::empty());
     }
 
     #[test]
     fn test_proposer_returns_candidate_set() {
-        let proposer = TestProposer;
+        let proposer = TestProposer::empty();
         let h = Hyp::unknown();
         let e = Evidence::new(vec![], test_provenance());
         let candidates = proposer.propose(&h, &e);
@@ -368,7 +476,7 @@ mod tests {
         };
         let h = Hyp::new(vec![atom]);
         let e = Evidence::new(vec![], test_provenance());
-        let proposer = TestProposer;
+        let proposer = TestProposer::empty();
         let candidates = proposer.propose(&h, &e);
         assert_eq!(candidates.len(), 0, "Test proposer returns empty set");
     }
@@ -377,7 +485,7 @@ mod tests {
     fn test_proposer_returns_set_not_option() {
         // Verify the type signature: returns Set<Hyp>, not Option<Hyp> or Vec<Hyp>.
         // This enforces the "no decision-making" constraint at the type level.
-        let proposer = TestProposer;
+        let proposer = TestProposer::empty();
         let h = Hyp::unknown();
         let e = Evidence::new(vec![], test_provenance());
         let candidates: CandidateSet = proposer.propose(&h, &e);
@@ -480,6 +588,119 @@ mod tests {
             err.ontology_bounded_failed(),
             "Error should report ontology-bounded failure for Unstructured input"
         );
+    }
+
+    #[test]
+    fn test_propose_and_filter_accepts_valid_candidates() {
+        // Proposer returns valid candidates; all should pass filtering
+        let input = Hyp::unknown();
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let valid_candidate = Hyp::new(vec![atom_a]);
+        let proposer = TestProposer::new(vec![valid_candidate.clone()]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let result = propose_and_filter(&proposer, &input, &evidence);
+        assert_eq!(
+            result.valid_candidates.len(),
+            1,
+            "Valid candidate should pass filtering"
+        );
+        assert_eq!(result.filtered_out_count, 0);
+        assert!(result.all_passed(), "No errors should be recorded");
+    }
+
+    #[test]
+    fn test_propose_and_filter_rejects_invalid_candidates() {
+        // Proposer returns invalid candidate (Unstructured atom); should be filtered
+        let input = Hyp::unknown();
+        let invalid_candidate = Hyp::new(vec![Atom {
+            system: OntologySystem::Unstructured,
+            code: "bad".to_string(),
+            preferred_term: "Invalid".to_string(),
+            version: "2026-01-31".to_string(),
+        }]);
+        let proposer = TestProposer::new(vec![invalid_candidate]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let result = propose_and_filter(&proposer, &input, &evidence);
+        assert_eq!(
+            result.valid_candidates.len(),
+            0,
+            "Invalid candidate should be filtered"
+        );
+        assert_eq!(result.filtered_out_count, 1);
+        assert!(!result.all_passed(), "Should record filtering error");
+        assert_eq!(result.filter_errors.len(), 1);
+        assert!(result.filter_errors[0].ontology_bounded_failed());
+    }
+
+    #[test]
+    fn test_propose_and_filter_mixed_candidates() {
+        // Proposer returns mix of valid and invalid; should filter selectively
+        let input = Hyp::unknown();
+        let valid_atom = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let invalid_atom = Atom {
+            system: OntologySystem::Unstructured,
+            code: "bad".to_string(),
+            preferred_term: "Invalid".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let proposer = TestProposer::new(vec![
+            Hyp::new(vec![valid_atom]),
+            Hyp::new(vec![invalid_atom]),
+        ]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let result = propose_and_filter(&proposer, &input, &evidence);
+        assert_eq!(
+            result.valid_candidates.len(),
+            1,
+            "One valid candidate should pass"
+        );
+        assert_eq!(
+            result.filtered_out_count, 1,
+            "One invalid candidate should be filtered"
+        );
+        assert_eq!(result.filter_errors.len(), 1);
+    }
+
+    #[test]
+    fn test_propose_and_filter_rejects_invalid_input() {
+        // Input hypothesis has Unstructured atom; proposer should not be called
+        let invalid_input = Hyp::new(vec![Atom {
+            system: OntologySystem::Unstructured,
+            code: "bad".to_string(),
+            preferred_term: "Invalid".to_string(),
+            version: "2026-01-31".to_string(),
+        }]);
+        let proposer = TestProposer::empty(); // Would not be called
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let result = propose_and_filter(&proposer, &invalid_input, &evidence);
+        assert_eq!(result.valid_candidates.len(), 0);
+        assert_eq!(
+            result.filter_errors.len(),
+            1,
+            "Input gate should reject invalid hypothesis"
+        );
+        assert!(result.filter_errors[0].ontology_bounded_failed());
+    }
+
+    #[test]
+    fn test_filter_result_all_passed() {
+        let result = FilterResult::new(vec![Hyp::unknown()].into_iter().collect(), 0, vec![]);
+        assert!(result.all_passed());
+        assert!(result.has_valid_candidates());
     }
 
     #[test]
