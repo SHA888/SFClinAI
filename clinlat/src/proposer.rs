@@ -36,46 +36,6 @@ use std::collections::HashSet;
 /// by the proposer; filtering is the substrate's responsibility (DEF-PS-15).
 pub type CandidateSet = HashSet<Hyp>;
 
-/// Black-box refinement proposer: generates candidate hypotheses without deciding.
-///
-/// # Trait Semantics (DEF-PS-14)
-///
-/// A refinement proposer is a function
-/// ```text
-/// π : Hyp^P × Evidence → Set⟨Hyp⟩
-/// ```
-///
-/// That is: given a current hypothesis `h` and evidence `e`, return a finite set of
-/// **candidate** refinements.
-///
-/// # Load-bearing Safety Property (INV-PS-06)
-///
-/// The proposer is the integration point for learned components (LLMs, classifiers,
-/// retrieval systems, etc.). Even if a proposer is adversarial or hallucinating:
-///
-/// - The soundness of the active hypothesis is **guaranteed by the deduction operators** (`Δ_PS`),
-///   not by the proposer's behavior.
-/// - No candidate from the proposer can become the active hypothesis without passing through
-///   a sound operator (DEF-PS-08).
-/// - This is the **load-bearing safety property of the patient substrate**: learned-component
-///   behavior cannot violate substrate soundness.
-///
-/// ## Example
-///
-/// ```ignore
-/// // A mock proposer that returns all hypotheses containing a specific atom.
-/// struct MockProposer { target_atom: Atom }
-///
-/// impl RefinementProposer for MockProposer {
-///     fn propose(&self, h: &Hyp, e: &Evidence) -> CandidateSet {
-///         // Return candidates that contain the target atom.
-///         // Note: No filtering, no decision-making. The substrate will validate.
-///         let mut candidates = HashSet::new();
-///         candidates.insert(h.clone());  // Can return input unchanged.
-///         candidates
-///     }
-/// }
-/// ```
 /// Error type for proposer constraint violations (DEF-PS-15).
 ///
 /// Tracks which constraint clauses failed: ontology-bounded or operator-reachable.
@@ -179,6 +139,7 @@ impl ProposerConstraint {
         // Check 1: Ontology-bounded (DEF-PS-15 clause 1, DEF-PS-04, OBL-PS-01)
         // Reject any Unstructured atoms per OBL-PS-01: free-text cannot enter Hyp through any path.
         // For coded systems, require non-empty code (basic format check; full validation deferred to OntologyAdapter).
+        // Note: empty atom set passes vacuously (no atoms to reject). This is correct: Unknown hypothesis has no atoms.
         for atom in candidate.atoms() {
             match atom.system {
                 OntologySystem::SNOMED
@@ -285,6 +246,46 @@ impl Default for ProposerConstraint {
     }
 }
 
+/// Black-box refinement proposer: generates candidate hypotheses without deciding.
+///
+/// # Trait Semantics (DEF-PS-14)
+///
+/// A refinement proposer is a function
+/// ```text
+/// π : Hyp^P × Evidence → Set⟨Hyp⟩
+/// ```
+///
+/// That is: given a current hypothesis `h` and evidence `e`, return a finite set of
+/// **candidate** refinements.
+///
+/// # Load-bearing Safety Property (INV-PS-06)
+///
+/// The proposer is the integration point for learned components (LLMs, classifiers,
+/// retrieval systems, etc.). Even if a proposer is adversarial or hallucinating:
+///
+/// - The soundness of the active hypothesis is **guaranteed by the deduction operators** (`Δ_PS`),
+///   not by the proposer's behavior.
+/// - No candidate from the proposer can become the active hypothesis without passing through
+///   a sound operator (DEF-PS-08).
+/// - This is the **load-bearing safety property of the patient substrate**: learned-component
+///   behavior cannot violate substrate soundness.
+///
+/// ## Example
+///
+/// ```ignore
+/// // A mock proposer that returns all hypotheses containing a specific atom.
+/// struct MockProposer { target_atom: Atom }
+///
+/// impl RefinementProposer for MockProposer {
+///     fn propose(&self, h: &Hyp, e: &Evidence) -> CandidateSet {
+///         // Return candidates that contain the target atom.
+///         // Note: No filtering, no decision-making. The substrate will validate.
+///         let mut candidates = HashSet::new();
+///         candidates.insert(h.clone());  // Can return input unchanged.
+///         candidates
+///     }
+/// }
+/// ```
 pub trait RefinementProposer: Send + Sync {
     /// Generate candidate refinements from a hypothesis and evidence.
     ///
@@ -389,21 +390,30 @@ mod tests {
 
     #[test]
     fn test_proposer_constraint_accepts_valid_candidate() {
-        // A candidate that refines the input (more atoms) and has valid atoms should pass
-        let input = Hyp::unknown();
-        let candidate = Hyp::new(vec![Atom {
+        // A candidate that refines input (superset of atoms) with valid atoms should pass both clauses
+        let atom_a = Atom {
             system: OntologySystem::SNOMED,
             code: "67822003".to_string(),
             preferred_term: "Hypoxemia".to_string(),
             version: "2026-01-31".to_string(),
-        }]);
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        // Input has only atom_a
+        let input = Hyp::new(vec![atom_a.clone()]);
+        // Candidate has both atoms: {a, b} ⊃ {a}, so it refines input (operator-reachable)
+        let candidate = Hyp::new(vec![atom_a, atom_b]);
         let evidence = Evidence::new(vec![], test_provenance());
 
         let constraint = ProposerConstraint::new();
         let result = constraint.validate(&candidate, &input, &evidence);
         assert!(
             result.is_ok(),
-            "Valid candidate (refines input, ontology-bounded) should pass validation"
+            "Valid candidate (refines input, ontology-bounded) should pass both clauses"
         );
     }
 
