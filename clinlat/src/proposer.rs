@@ -320,23 +320,54 @@ pub trait RefinementProposer: Send + Sync {
 /// Result of filtering proposer output through constraint validation.
 ///
 /// Returned by `propose_and_filter` to track valid candidates, filtered count, and errors.
+///
+/// # Invariant
+///
+/// In the normal (post-proposer) path: `filtered_out_count == filter_errors.len()`.
+/// The single exception is an input-gate rejection, where `filtered_out_count == 0`
+/// (no proposer output was produced) but `filter_errors.len() == 1` (the input-gate
+/// `ConstraintError` is recorded). Callers can distinguish the two cases by checking
+/// `filtered_out_count == 0 && !filter_errors.is_empty()`.
 #[derive(Clone, Debug)]
 pub struct FilterResult {
-    /// Candidates that passed the ontology-bounded and operator-reachable checks
+    /// Candidates that passed the ontology-bounded and operator-reachable checks.
     pub valid_candidates: CandidateSet,
-    /// Number of candidates rejected by filtering
+    /// Number of proposer output candidates rejected by the output-side gate.
+    /// Zero when the function returns early due to an input-gate failure (no candidates
+    /// were produced); in that case `filter_errors` carries the input-gate error.
     pub filtered_out_count: usize,
-    /// Structured errors from rejected candidates (for audit trail / debugging)
+    /// Structured errors for audit trail and debugging.
+    ///
+    /// In the normal path: one entry per rejected output candidate (ontology or
+    /// reachability violation). In the input-gate early-return path: one entry
+    /// for the input-side validation failure, with `filtered_out_count == 0`.
     pub filter_errors: Vec<ConstraintError>,
 }
 
 impl FilterResult {
     /// Create a new filter result.
+    ///
+    /// # Panics (debug only)
+    ///
+    /// Panics in debug builds if the post-proposer invariant
+    /// `filtered_out_count == filter_errors.len()` is violated without being an
+    /// input-gate case (`filtered_out_count == 0, filter_errors.len() == 1`).
     pub fn new(
         valid_candidates: CandidateSet,
         filtered_out_count: usize,
         filter_errors: Vec<ConstraintError>,
     ) -> Self {
+        // Assert the invariant: filtered_out_count must equal filter_errors.len(),
+        // except in the input-gate early-return case where filtered_out_count == 0
+        // and filter_errors holds exactly one input-gate error.
+        debug_assert!(
+            filtered_out_count == filter_errors.len()
+                || (filtered_out_count == 0 && filter_errors.len() == 1),
+            "FilterResult invariant violated: filtered_out_count={} but filter_errors.len()={}; \
+             these must be equal except when filtered_out_count==0 (input-gate rejection)",
+            filtered_out_count,
+            filter_errors.len()
+        );
         Self {
             valid_candidates,
             filtered_out_count,
@@ -372,11 +403,15 @@ impl FilterResult {
 ///    - If invalid, record error and increment filtered count.
 /// 3. Return `FilterResult` with valid set, filtered count, and error list.
 ///
-/// # Side effects
+/// # Audit trail (OBL-PS-04)
 ///
-/// Logs each filtering decision for audit trail (OBL-PS-04). Logs are structured:
-/// - `valid: <hash>` for candidates that pass.
-/// - `invalid: <hash> due to <clause>` for candidates that fail.
+/// OBL-PS-04 requires that every filtering decision be reconstructible. Currently this
+/// function returns structured `ConstraintError` values in `FilterResult.filter_errors`
+/// for downstream recording; it does **not** itself emit log output.
+///
+/// TODO (OBL-PS-04): wire structured logging here once a tracing subscriber is
+/// wired into the clinlat kernel (e.g., `tracing::debug!("propose_and_filter: \
+/// candidate {:?} rejected: {}", candidate, err)`). Tracking: task 8.4 / 8.5.
 pub fn propose_and_filter(
     proposer: &dyn RefinementProposer,
     h: &Hyp,
