@@ -116,7 +116,7 @@ pub use ontology::{
 pub use operator::{Evidence, Observation, Operator, abstract_evidence, is_consistent_with};
 pub use operator_set::{OperatorMetadata, OperatorSet, SetOutcome};
 pub use outcome::Outcome;
-pub use proposer::{CandidateSet, RefinementProposer};
+pub use proposer::{CandidateSet, ConstraintError, ProposerConstraint, RefinementProposer};
 pub use provenance::{Provenance, ProvenanceOrigin};
 pub use sofa::{SofaRespEvidence, SofaRespHypothesis, SofaRespOperator};
 pub use version::Ver;
