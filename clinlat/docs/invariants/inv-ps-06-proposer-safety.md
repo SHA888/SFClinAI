@@ -2,13 +2,17 @@
 
 **Invariant:** Even if a refinement proposer is adversarial or hallucinating, the soundness of the active hypothesis depends only on the deduction operators (`Δ_PS`), not on the proposer's behavior.
 
-**Formal statement (from SPEC.md §2.7):**
+**Formal statement (verbatim, SPEC.md §2.7, INV-PS-06):**
 
-> For any proposer `π` (including adversarial ones) and any hypothesis `h` and evidence `e`:
-> - If `ω ∈ OperatorSet.apply_set(h, e)` and `ω` is the active hypothesis, then `ω` is sound.
-> - The soundness property is structural: it holds **regardless of the candidates proposed by `π`**.
+> The proposer cannot produce a refined hypothesis that becomes the active hypothesis without passing through a sound deduction operator (DEF-PS-08). Even if the proposer is adversarial, the soundness of the active hypothesis depends only on `Δ_PS`, not on `π`.
+>
+> This is the load-bearing safety property of the patient substrate: **learned-component behavior cannot violate substrate soundness**.
 
-**Status:** Informal argument (property-test discharge at task 8.6).
+The companion obligation **OBL-PS-05** (SPEC.md §2.7) states the enforcement mechanism that this argument relies on:
+
+> No code path may insert a value into `Hyp^P` (as the active patient hypothesis) without that value being the `Refined(_)` branch of some sound operator's output. Enforcement is structural: the active-hypothesis type and the proposer-output type are distinct, and only operator results inhabit the former.
+
+**Status:** Informal argument (property-test discharge at task 8.6). This document argues the invariant against the substrate's *intended* end-to-end flow. Two pieces of that flow are not yet built or are stubbed at the time of writing; they are disclosed explicitly under [Disclosed gaps](#disclosed-gaps-not-yet-built-or-stubbed) so the argument's scope is not overstated.
 
 ---
 
@@ -24,53 +28,71 @@ An **adversarial proposer** is one that:
 - Suggests SNOMED codes it invented (e.g., "99999999" as a fictional concept).
 - Proposes hypotheses with Unstructured atoms (free text).
 - Returns candidates that have fewer atoms than the input (non-refining).
-- Suggests operators that don't exist in the operator set.
+- Returns candidates a clinically sound operator would never derive from the evidence.
 
 ---
 
 ## Proof Strategy
 
-The proof is a **two-stage firewall**:
+The safety property rests on **two independent lines of defence**. The second is the load-bearing one; the first is defence-in-depth.
 
-1. **Stage 1: Proposer Constraint (DEF-PS-15)**
-   - `ProposerConstraint.validate()` filters proposer output before it reaches the soundness gate.
-   - Rejects candidates outside ontology bounds (Clause 1).
-   - Rejects candidates not reachable by one operator step (Clause 2).
-   - **Effect:** Invalid candidates are eliminated before the soundness gate sees them.
+1. **Stage 1 — Proposer constraint filter (DEF-PS-15), defence-in-depth.**
+   - `ProposerConstraint::validate()` filters proposer output before it is used.
+   - Rejects candidates that are not ontology-bounded (Clause 1).
+   - Rejects candidates that do not refine the input hypothesis (Clause 2, conservative form — see note below).
+   - **Effect:** Most malformed candidates are discarded early, improving the audit trail. This stage is *advisory hygiene*, not the soundness guarantee — even if it let a bad candidate through, Stage 2 would still hold.
 
-2. **Stage 2: Soundness Gate (OperatorSet.apply_set())**
-   - `OperatorSet.apply_set()` is the **only mechanism that licenses a candidate to become the active hypothesis** (DEF-PS-08, Diagram 3 node `SV`).
-   - The gate applies each operator in `Δ_PS` to the input hypothesis `h`.
-   - Only candidates that **exactly match** the output of at least one operator are licensed.
-   - **Effect:** The active hypothesis is produced by a sound operator, hence sound.
+2. **Stage 2 — Structural operator-origin guarantee (OBL-PS-05), load-bearing.**
+   - The committed (active) hypothesis is never *selected from* the proposer's candidate set. It is the `result` field of `OperatorSet::apply_set(h, e)`, which is constructed **only** from the `Outcome::Refined(_)` branch of registered operators (`operator_set.rs:113–127`). `apply_set` does not take the candidate set as an argument and never reads it.
+   - Because the proposer-output type (`CandidateSet`) and the active-hypothesis value (`SetOutcome.result: Hyp`) are produced by disjoint code paths, an adversarial proposer **cannot place a value into the active-hypothesis slot at all** — not by matching, not by injection. The proposer can only influence *which refinements are explored*, never *what is committed*.
+   - **Effect:** The active hypothesis is, by construction, the output of a sound operator (DEF-PS-08), hence sound — independent of `π`.
+
+> **Note on "operator-reachable" (Clause 2).** SPEC.md DEF-PS-15.2 defines reachability as "there exists `δ ∈ Δ_PS` that could plausibly produce this refinement." The current implementation discharges this conservatively as `candidate.atoms() ⊇ input.atoms()` (candidate refines input). This is sound-but-incomplete: it admits some candidates no operator would actually produce. That gap is harmless for INV-PS-06 because Stage 2 — not Stage 1 — is what guarantees soundness.
 
 ---
 
-## The Waterfall
+## The Two Paths
+
+The key structural fact is that the proposer's output and the active hypothesis travel on **separate, non-converging paths**:
 
 ```
-Proposer π(h, e)
-     ↓ [outputs candidates]
-Proposer Constraint (DEF-PS-15)
-     ↓ [filters invalid]
-Valid candidates
-     ↓ [fed to soundness gate]
-OperatorSet.apply_set(h, e)
-     ↓ [applies each operator in Δ_PS]
-Licensed hypotheses (↥_PS)
-     ↓ [one becomes active via external policy]
-Active hypothesis ω_active
+                    Proposer π(h, e)
+                          │
+                          ▼
+                    CandidateSet                 ← proposer-output type
+                          │
+                          ▼
+         ProposerConstraint::validate()          ← Stage 1 (advisory filter)
+                          │
+                          ▼
+              valid candidates (search hints)
+                          ┊
+   ( used only to decide WHICH refinements to explore — never committed )
+                          ┊
+─────────────────────────────────────────────────────────────────────────
+                          │
+   OperatorSet::apply_set(h, e)                  ← reads h and e ONLY,
+        for δ in Δ_PS:                             never the candidate set
+            match δ.apply(current_h, e):
+                Refined(h') ⟹ current_h = h'     ← active value built here
+                Abstain(r)  ⟹ record r
+                          │
+                          ▼
+        SetOutcome { result, abstentions }        ← active-hypothesis type
+                          │
+                          ▼
+                  Active hypothesis = result
 ```
 
 **Key observations:**
 
-1. **Constraint filter is defensive:** Even if the proposer is adversarial, the constraint filter rejects candidates that violate DEF-PS-15. Unstructured atoms, fabricated codes, non-refining hypotheses — all caught here.
+1. **The paths never merge.** `apply_set` (`operator_set.rs:109`) has signature `(&Hyp, &Evidence) -> SetOutcome`. It has no parameter for the candidate set and cannot read it. The proposer therefore has *no channel* through which to place a value into `SetOutcome.result`.
 
-2. **Soundness gate is deterministic:** The gate does not trust the proposer. It **recomputes the candidates itself** by applying each operator independently. The proposer's output is only a **suggestion**. The gate decides.
+2. **The committed value is operator-built, not candidate-selected.** `result` starts as `h.clone()` and is reassigned only inside the `Outcome::Refined(h')` arm of a registered operator (`operator_set.rs:115–121`). No proposer candidate is ever copied into it.
 
-3. **Independence:** The proposer and operators are decoupled. The proposer's internal logic, ML model weights, hyperparameters — none of this affects the gate's output. Only the operators matter.
+3. **Independence from the proposer's internals.** The proposer's logic, model weights, and hyperparameters affect only *search ordering* (Stage 1's candidates are hints). They cannot affect `apply_set`'s output, which is a pure function of `h`, `e`, and `Δ_PS`.
 
-4. **Closed-loop:** The active hypothesis is always a member of `OperatorSet.apply_set(h, e)`. By DEF-PS-08 (operator soundness), all members of this set are sound. Therefore, the active hypothesis is sound.
+4. **Soundness follows directly.** `result` is either the untouched input `h` (all operators abstained) or the `Refined(_)` output of a sound operator. By DEF-PS-08 every operator's `Refined` output refines the input soundly; therefore `result` is sound — for any `π`, adversarial or not.
 
 ---
 
@@ -78,7 +100,7 @@ Active hypothesis ω_active
 
 ### Setup
 
-- **Operators:** `{SofaRespOperator, KdigoAkiOperator}` (sound by construction, task 8.1–8.5).
+- **Operators:** `{SofaRespOperator, KdigoAkiOperator}` (sound by construction; shipped and tested in M1).
 - **Input hypothesis:** `h₀ = Unknown` (no information).
 - **Evidence:** `e = {pao2_fio2 = 150, creatinine = 2.5, urine_output = 200}`.
 - **Proposer:** An LLM that hallucinates.
@@ -88,51 +110,60 @@ Active hypothesis ω_active
 ```
 "Based on the evidence, I suggest these hypotheses:
   - {Unstructured: 'the patient has severe hypoxemia'}
-  - {SNOMED: '99999999'}
-  - {SNOMED: '67822003'}
-  - {SNOMED: '3723001', KDIGO: 'Stage 3'}
+  - {SNOMED: '99999999'}          (a code the LLM invented)
+  - {SNOMED: '67822003'}          (Hypoxemia — a real code)
+  - {SNOMED: '3723001', SNOMED: '14669001'}  (ARDS + acute renal failure)
 "
 ```
 
-### Stage 1: Proposer Constraint Filtering
+### Stage 1: Proposer Constraint Filtering (advisory)
 
-Each candidate is validated against DEF-PS-15:
+Each candidate is validated against DEF-PS-15 by `ProposerConstraint::validate()`. Input is `h₀ = Unknown` (empty atom set), so every candidate trivially satisfies the conservative operator-reachable check (`atoms ⊇ ∅`). The current implementation enforces the ontology-bounded clause as: reject `Unstructured`, reject empty codes (`proposer.rs:143–162`).
 
-| Candidate | Ontology-bounded? | Operator-reachable? | Filtered? | Reason |
-|-----------|------------------|-------------------|-----------|--------|
-| `{Unstructured: 'hypoxemia'}` | ✗ (free text) | ✓ | **REJECTED** | OBL-PS-01: Unstructured prohibited |
-| `{SNOMED: '99999999'}` | ✗ (code unknown) | ✓ (from Unknown) | **REJECTED** | Code not in SNOMED ontology |
-| `{SNOMED: '67822003'}` | ✓ | ✓ (from Unknown) | ✓ | Valid refinement |
-| `{SNOMED: '3723001', KDIGO: 'Stage 3'}` | ✓ | ? | Depends on input | See below |
+| Candidate | Ontology clause (current impl) | Filtered today? | Note |
+|-----------|-------------------------------|-----------------|------|
+| `{Unstructured: 'hypoxemia'}` | ✗ rejected — `Unstructured` (OBL-PS-01) | **REJECTED** | Enforced now |
+| `{SNOMED: '99999999'}` | ✓ passes — code is non-empty | **PASSES** | ⚠️ *Code existence not yet checked* — see below |
+| `{SNOMED: '67822003'}` | ✓ passes | passes | Valid refinement |
+| `{SNOMED: '3723001', '14669001'}` | ✓ passes | passes | Valid refinement |
 
-**Result:** 1 invalid, 1 ambiguous, 2 candidates pass constraint.
+> ⚠️ **Honest disclosure:** the fabricated code `99999999` is **not** rejected by the current Stage-1 filter — code-existence validation against the `OntologyAdapter` is an open TODO (`proposer.rs:154`). At the property-test tier this will be closed (task 8.6). **Crucially, INV-PS-06 holds anyway**, because Stage 1 is not what guarantees soundness — Stage 2 does. The next subsection shows why this surviving hallucination is still harmless.
 
-### Stage 2: Soundness Gate
+### Stage 2: The candidates never reach the active hypothesis
 
-The gate applies each operator to `h₀ = Unknown`:
+This is the load-bearing step. The substrate does **not** select the active hypothesis from the (partially filtered) candidate set. It computes it independently:
 
 ```rust
-let sofas = SofaRespOperator.apply(h₀, e);
-// Returns: {Hyp with SOFA-3 respiratory band}
-let kdigas = KdigoAkiOperator.apply(h₀, e);
-// Returns: {Hyp with KDIGO AKI stage}
-let licensed = sofas ∪ kdigas;
+// Candidates from Stage 1 are search hints only — NOT passed here.
+let outcome = operator_set.apply_set(&h0, &e);
+//   apply_set signature: (&Hyp, &Evidence) -> SetOutcome
+//   It reads h0 and e. It never sees `candidates`.
+//
+// Inside apply_set (operator_set.rs:113-127), for each registered operator:
+//   match op.apply(&current_h, &e) {
+//       Outcome::Refined(h_prime) => current_h = h_prime,  // sound by DEF-PS-08
+//       Outcome::Abstain(reason)  => record(reason),       // current_h unchanged
+//   }
+//
+// active_hypothesis = outcome.result;  // built only from Refined(_) outputs
 ```
 
-The soundness gate returns the union of all operator results. **Only these are licensed hypotheses.** The LLM's hallucinations don't make it here—they were filtered at stage 1.
+The surviving hallucination `{SNOMED: '99999999'}` is in the candidate set, but the candidate set is never an input to `apply_set`. Whatever `SofaRespOperator` and `KdigoAkiOperator` derive from `h₀` and `e` is what gets committed; the invented code has no path to `outcome.result`.
 
 ### Output: Sound
 
 ```
-Soundness proof for ω_active:
-  ω_active ∈ licensed
-  licensed ⊆ apply_set(h₀, e)
-  apply_set(h₀, e) = {SofaRespOperator.apply(...) ∪ KdigoAkiOperator.apply(...)}
-  All operators are sound (DEF-PS-08)
-  ⇒ ω_active is sound ✓
+Soundness of active_hypothesis = outcome.result:
+  outcome.result is either:
+    (a) h₀ unchanged           — if every operator abstained, or
+    (b) Refined(_) output of a registered operator δ ∈ Δ_PS.
+  Every δ satisfies DEF-PS-08 (Refined(h') ⟹ h' ⊑_PS h, soundly).
+  The candidate set never enters apply_set (no parameter for it).
+  ⇒ active_hypothesis is sound, for any π — including one whose
+    fabricated code survived Stage 1. ✓
 ```
 
-**The LLM's hallucinations never reach the active hypothesis.**
+**The LLM's hallucination survives Stage 1 but is structurally incapable of becoming the active hypothesis.** That is a *stronger* statement than "it was filtered out": even an unfiltered hallucination cannot compromise soundness.
 
 ---
 
@@ -150,27 +181,33 @@ The substrate **absorbs and neutralizes** the uncertainty of learned components.
 
 ## Residual Assumptions
 
-This proof assumes:
+This argument is at the **informal-argument tier**. It assumes:
 
-1. **Operator soundness (DEF-PS-08):** Each operator in `Δ_PS` is sound by construction. This is discharged per-operator (e.g., task 8.1 for SOFA-3, task 8.5 for additional operators).
+1. **Operator soundness (DEF-PS-08, OBL-PS-03):** Each operator in `Δ_PS` is sound by construction. Discharged per-operator (SOFA-3 at property-test tier; KDIGO AKI / Wells-PE / CURB-65 with soundness arguments, M1).
 
-2. **Proposer constraint correctness (DEF-PS-15, tasks 8.1–8.3):** The constraint validation and `propose_and_filter` adapter are correctly implemented. Discharged by property-test tier (task 8.6).
+2. **Operator-origin enforcement (OBL-PS-05):** `OperatorSet::apply_set` is the only constructor of the active-hypothesis value, and it never reads the candidate set. This is currently enforced by the `apply_set` signature `(&Hyp, &Evidence) -> SetOutcome` (no candidate parameter exists). SPEC OBL-PS-05 calls for this to be enforced by *type* distinctness (proposer-output type vs. active-hypothesis type); today the separation is by function signature, not by a newtype barrier. Hardening to a distinct active-hypothesis newtype is future work.
 
-3. **Operator set integrity:** `OperatorSet.apply_set()` is the **only** mechanism that can license hypotheses to become active. Enforced structurally by the module boundary (Diagram 3, `SV` node).
+## Disclosed gaps (not yet built or stubbed)
 
-4. **No side channels:** No learned component can modify the active hypothesis state except through `OperatorSet.apply_set()`. Enforced by access control and module isolation.
+The argument above describes the substrate's intended end-to-end flow. Two parts of that flow are incomplete at the time of writing. Neither weakens INV-PS-06, because the invariant rests on Stage 2, but they are disclosed so the scope is honest:
+
+1. **Ontology code-existence check is a stub.** `ProposerConstraint::validate` currently rejects only `Unstructured` atoms and empty codes; it does not yet verify that a coded atom resolves in its ontology (`proposer.rs:154`, TODO). Fabricated-but-non-empty codes survive Stage 1 today. Closed at task 8.6 (property tier).
+
+2. **`propose_verify` (the candidate-routing soundness-verification adapter) is not yet built.** Task 8.5 (`cc:todo`) will route constraint-passing candidates through `apply_set` and emit `AbstainReason::NoOperatorLicenses` when none is licensed. **Open design question for 8.5:** since `apply_set` returns a single threaded `result` (not a per-operator set of outputs), the mechanism by which a *specific* candidate is judged "licensed by ≥1 operator" must be defined — e.g., re-running each operator individually from `h` and testing candidate equality against its `Refined` output, rather than against the threaded composition. This document deliberately does **not** assume that mechanism; the INV-PS-06 argument here depends only on the operator-origin property of `apply_set`, which holds independently of how 8.5 defines candidate licensing.
 
 ---
 
 ## References
 
 - **Formal definition:** SPEC.md §2.7 (INV-PS-06)
+- **Enforcement obligation:** SPEC.md §2.7 (OBL-PS-05 proposer-operator separation)
 - **Proposer semantics:** SPEC.md §2.7 (DEF-PS-14 `RefinementProposer`)
 - **Constraint:** SPEC.md §2.7 (DEF-PS-15 proposer codomain)
-- **Soundness gate:** SPEC.md §2.4 (DEF-PS-08 operator soundness)
+- **Operator soundness:** SPEC.md §2.4 (DEF-PS-08, INV-PS-03 monotonicity, DEF-PS-09 operator set, OBL-PS-03 set soundness)
 - **Implementation:**
-  - clinlat/src/proposer.rs (RefinementProposer trait, ProposerConstraint, propose_and_filter)
-  - clinlat/src/operator_set.rs (OperatorSet, apply_set)
+  - `clinlat/src/proposer.rs` (`RefinementProposer` trait, `ProposerConstraint`, `propose_and_filter`)
+  - `clinlat/src/operator_set.rs` (`OperatorSet::apply_set` — the operator-origin boundary)
+  - `clinlat/src/outcome.rs` (`Outcome<Hyp, AbstainReason>` — single `Refined`/`Abstain`, not a set)
 - **Position statement:** NOTE.md §4A.5 (constrained refinement proposer), §5 (substrate-first framing)
 
 ---
@@ -178,6 +215,7 @@ This proof assumes:
 ## Next Steps
 
 **Property-test discharge (task 8.6):**
-- Generate adversarial proposers with ≥10 hallucination profiles (out-of-ontology atoms, non-refining, Unstructured, non-existent codes).
-- Verify: every path through `propose_and_filter` → `OperatorSet.apply_set()` yields sound results.
-- Property: `∀ adversarial π, ∀ h, ∀ e: soundness(active_hyp) = soundness(operators)`.
+- Generate adversarial proposers with ≥10 hallucination profiles (out-of-ontology atoms, non-refining candidates, `Unstructured` atoms, fabricated-but-non-empty codes).
+- Assert the operator-origin property directly: for any such `π`, the value committed by `apply_set(h, e)` is identical whether the proposer is sound or adversarial — i.e. `apply_set`'s output is invariant under proposer substitution, because it never reads the candidate set.
+- Close the disclosed Stage-1 gap: extend `ProposerConstraint::validate` to reject coded atoms that do not resolve via the `OntologyAdapter` (currently `proposer.rs:154` TODO), and add ≥10 cases over out-of-bounds candidate generators.
+- Property: `∀ adversarial π, ∀ h, ∀ e: apply_set(h, e).result` is sound and equal to the sound-proposer result.
