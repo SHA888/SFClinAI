@@ -75,7 +75,7 @@ pub type CandidateSet = HashSet<Hyp>;
 ///     }
 /// }
 /// ```
-pub trait RefinementProposer {
+pub trait RefinementProposer: Send + Sync {
     /// Generate candidate refinements from a hypothesis and evidence.
     ///
     /// # Arguments

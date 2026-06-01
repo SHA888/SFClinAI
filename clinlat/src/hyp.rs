@@ -19,7 +19,7 @@ use std::collections::HashSet;
 /// - Each concrete hypothesis carries resolved `Atom` payloads from external ontologies.
 ///
 /// Implements DEF-PS-01 (refinement order) and INV-PS-02 (partial meet).
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Hyp(Vec<Atom>);
 
 impl Hyp {
