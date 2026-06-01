@@ -39,6 +39,11 @@ pub enum AbstainReason {
     /// Evidence or hypothesis refers to concepts outside the operator's ontology.
     /// TODO (v0.2.0+): replace `&'static str` with `Set<AtomId>` per DEF-PS-10.
     OntologyOutOfScope(&'static str),
+    /// No operator in the set licenses any of the proposed candidates (DEF-PS-12/13, soundness gate M2.2).
+    /// When all candidates from the proposer are rejected by the soundness-verification gate,
+    /// the substrate returns this reason instead of silently dropping them.
+    /// TODO (v0.2.0+): replace `&'static str` with structured detail `(candidates_rejected: usize, operator_verdicts: ...)`.
+    NoOperatorLicenses(&'static str),
 }
 
 impl AbstainReason {
@@ -50,6 +55,7 @@ impl AbstainReason {
             AbstainReason::AmbiguousRefinement(msg) => msg,
             AbstainReason::OperatorPreconditionUnmet(msg) => msg,
             AbstainReason::OntologyOutOfScope(msg) => msg,
+            AbstainReason::NoOperatorLicenses(msg) => msg,
         }
     }
 }
@@ -71,5 +77,6 @@ mod tests {
         let _ = AbstainReason::AmbiguousRefinement("test");
         let _ = AbstainReason::OperatorPreconditionUnmet("test");
         let _ = AbstainReason::OntologyOutOfScope("test");
+        let _ = AbstainReason::NoOperatorLicenses("test");
     }
 }

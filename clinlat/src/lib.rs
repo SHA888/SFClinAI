@@ -118,7 +118,7 @@ pub use operator_set::{OperatorMetadata, OperatorSet, SetOutcome};
 pub use outcome::Outcome;
 pub use proposer::{
     CandidateSet, ConstraintError, FilterResult, ProposerConstraint, RefinementProposer,
-    propose_and_filter,
+    VerifyResult, propose_and_filter, propose_verify,
 };
 pub use provenance::{Provenance, ProvenanceOrigin};
 pub use sofa::{SofaRespEvidence, SofaRespHypothesis, SofaRespOperator};

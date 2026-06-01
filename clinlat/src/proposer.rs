@@ -448,6 +448,145 @@ pub fn propose_and_filter(
     FilterResult::new(valid_candidates, filtered_out_count, filter_errors)
 }
 
+/// Result of propose_verify: candidates licensed by the soundness gate.
+///
+/// Returned by `propose_verify` to track which candidates passed the soundness gate
+/// (operator licensing check). The audit trail records verdicts for traceability.
+///
+/// # Invariant
+///
+/// `licensed_candidates ⊆ input_candidates` (filtering, never expansion).
+/// If `licensed_candidates.is_empty()`, the substrate should return
+/// `Err(AbstainReason::NoOperatorLicenses)` instead of this type.
+#[derive(Clone, Debug)]
+pub struct VerifyResult {
+    /// Candidates whose atoms are reachable by the operator set (licensed).
+    pub licensed_candidates: CandidateSet,
+    /// Candidates that were rejected by the soundness gate (operator-unreachable).
+    pub unlicensed_candidates: CandidateSet,
+    /// Audit trail: which candidates passed/failed and why.
+    /// Format: (candidate_atoms_string, is_licensed, operator_set_result_atoms_string)
+    pub licensing_verdicts: Vec<(String, bool, String)>,
+}
+
+impl VerifyResult {
+    /// Create a new verify result.
+    pub fn new(
+        licensed_candidates: CandidateSet,
+        unlicensed_candidates: CandidateSet,
+        licensing_verdicts: Vec<(String, bool, String)>,
+    ) -> Self {
+        Self {
+            licensed_candidates,
+            unlicensed_candidates,
+            licensing_verdicts,
+        }
+    }
+
+    /// Check if any candidates were licensed.
+    pub fn has_licensed_candidates(&self) -> bool {
+        !self.licensed_candidates.is_empty()
+    }
+
+    /// Check if all candidates were unlicensed.
+    pub fn all_unlicensed(&self) -> bool {
+        !self.unlicensed_candidates.is_empty() && self.licensed_candidates.is_empty()
+    }
+}
+
+/// Adapter that routes proposer output through the soundness-verification gate.
+///
+/// This is the implementation of the **soundness-verification (SV) node** in Diagram 3 (M2.2).
+/// It enforces DEF-PS-08 licensing on every candidate accepted by `propose_and_filter`,
+/// preventing unsound hypotheses from becoming active.
+///
+/// # Semantics
+///
+/// Given proposer output (via `propose_and_filter`), operator set, hypothesis, and evidence:
+///
+/// 1. Call `propose_and_filter` to get valid candidates (constraint-passing).
+/// 2. Apply operator set to input hypothesis to get the soundness-verified result.
+/// 3. For each valid candidate, check if its atoms are included in the result:
+///    - If candidate.atoms ⊆ result.atoms, the candidate is licensed (on the path to the result).
+///    - Otherwise, the candidate is unlicensed (no operator path justifies it).
+/// 4. Return `Ok(VerifyResult)` with licensed candidates and audit trail, or
+///    `Err(AbstainReason::NoOperatorLicenses)` if all candidates are unlicensed.
+///
+/// # Invariant (INV-PS-06 Enforcement)
+///
+/// Every hypothesis that emerges from propose_verify is guaranteed to be reachable
+/// by applying some subset of the operator set to the input hypothesis.
+/// This is the load-bearing safety property: learned-component output cannot bypass soundness.
+///
+/// # Audit Trail (OBL-PS-04)
+///
+/// Every licensing decision is recorded in `licensing_verdicts` for traceability.
+/// The audit trail names which candidates passed/failed and why.
+pub fn propose_verify(
+    proposer: &dyn RefinementProposer,
+    operators: &crate::operator_set::OperatorSet,
+    h: &Hyp,
+    e: &Evidence,
+) -> Result<VerifyResult, crate::abstain::AbstainReason> {
+    // Step 1: Filter proposer output through constraint validator (propose_and_filter)
+    let filter_result = propose_and_filter(proposer, h, e);
+
+    // Step 2: Apply operator set to get soundness-verified result
+    let set_outcome = operators.apply_set(h, e);
+    let result_atoms = set_outcome.result.atoms();
+    let result_atoms_str = format!(
+        "{{{}}}",
+        result_atoms
+            .iter()
+            .map(|a| format!("{}:{}", a.system, a.code))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    // Step 3: Check each valid candidate for licensing
+    let mut licensed_candidates = CandidateSet::new();
+    let mut unlicensed_candidates = CandidateSet::new();
+    let mut licensing_verdicts = Vec::new();
+
+    for candidate in filter_result.valid_candidates.iter() {
+        let candidate_atoms = candidate.atoms();
+        let candidate_atoms_str = format!(
+            "{{{}}}",
+            candidate_atoms
+                .iter()
+                .map(|a| format!("{}:{}", a.system, a.code))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+
+        // Check if candidate atoms are a subset of result atoms (licensed by operator set)
+        let is_licensed = candidate_atoms
+            .iter()
+            .all(|c_atom| result_atoms.iter().any(|r_atom| r_atom == c_atom));
+
+        if is_licensed {
+            licensed_candidates.insert(candidate.clone());
+            licensing_verdicts.push((candidate_atoms_str, true, result_atoms_str.clone()));
+        } else {
+            unlicensed_candidates.insert(candidate.clone());
+            licensing_verdicts.push((candidate_atoms_str, false, result_atoms_str.clone()));
+        }
+    }
+
+    // Step 4: Return result or abstention
+    if licensed_candidates.is_empty() {
+        Err(crate::abstain::AbstainReason::NoOperatorLicenses(
+            "no proposer candidates licensed by operator set",
+        ))
+    } else {
+        Ok(VerifyResult::new(
+            licensed_candidates,
+            unlicensed_candidates,
+            licensing_verdicts,
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -773,5 +912,312 @@ mod tests {
             }
             Ok(()) => panic!("Expected validation to fail: candidate must refine input"),
         }
+    }
+
+    // TDD tests for propose_verify (task 8.5)
+
+    use crate::operator::Operator;
+    use crate::operator_set::{OperatorMetadata, OperatorSet};
+    use crate::outcome::Outcome;
+
+    /// Refining fixture operator: adds a specific atom to any hypothesis
+    struct RefiningOperatorFixture {
+        atom_to_add: Atom,
+    }
+
+    impl Operator for RefiningOperatorFixture {
+        fn apply(&self, h: &Hyp, _e: &Evidence) -> Outcome<Hyp, crate::abstain::AbstainReason> {
+            let mut atoms = h.atoms().to_vec();
+            atoms.push(self.atom_to_add.clone());
+            Outcome::Refined(Hyp::new(atoms))
+        }
+    }
+
+    #[test]
+    fn test_propose_verify_licenses_candidates_in_operator_result() {
+        // Proposer generates {A}, operator set produces {A, B}.
+        // Candidate {A} should be licensed (atoms ⊆ result atoms).
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        // Proposer returns {A}
+        let candidate = Hyp::new(vec![atom_a.clone()]);
+        let proposer = TestProposer::new(vec![candidate.clone()]);
+
+        // Operator set adds B to input {A}
+        let input = Hyp::new(vec![atom_a.clone()]);
+        let mut operators = OperatorSet::new();
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddB".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let evidence = Evidence::new(vec![], test_provenance());
+        let result = propose_verify(&proposer, &operators, &input, &evidence);
+
+        assert!(
+            result.is_ok(),
+            "propose_verify should succeed when candidates are licensed"
+        );
+        let verify_result = result.unwrap();
+        assert!(verify_result.has_licensed_candidates());
+        assert_eq!(verify_result.licensed_candidates.len(), 1);
+    }
+
+    #[test]
+    fn test_propose_verify_rejects_unlicensed_candidates() {
+        // Proposer generates {A}, operator produces {B}.
+        // Candidate {A} should be unlicensed (atoms ⊄ result atoms).
+        // Function should return Err(NoOperatorLicenses).
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        // Proposer returns {A}
+        let candidate = Hyp::new(vec![atom_a.clone()]);
+        let proposer = TestProposer::new(vec![candidate]);
+
+        // Operator set replaces input (unknown) with {B}
+        let input = Hyp::unknown();
+        let mut operators = OperatorSet::new();
+        // Create a refining operator that just adds B
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddB".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let evidence = Evidence::new(vec![], test_provenance());
+        let result = propose_verify(&proposer, &operators, &input, &evidence);
+
+        assert!(
+            result.is_err(),
+            "propose_verify should return Err when all candidates are unlicensed"
+        );
+        match result.unwrap_err() {
+            crate::abstain::AbstainReason::NoOperatorLicenses(_) => {
+                // Expected
+            }
+            other => panic!("Expected NoOperatorLicenses, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_propose_verify_mixed_licensed_unlicensed() {
+        // Proposer generates {A} and {B}, operator produces {A, B}.
+        // Both candidates should be licensed.
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        // Proposer returns {A} and {B}
+        let candidate_a = Hyp::new(vec![atom_a.clone()]);
+        let candidate_b = Hyp::new(vec![atom_b.clone()]);
+        let proposer = TestProposer::new(vec![candidate_a, candidate_b]);
+
+        // Operator adds both A and B to input (unknown)
+        let input = Hyp::unknown();
+        let mut operators = OperatorSet::new();
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_a.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddA".to_string(),
+                version: "test".to_string(),
+            },
+        );
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddB".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let evidence = Evidence::new(vec![], test_provenance());
+        let result = propose_verify(&proposer, &operators, &input, &evidence);
+
+        assert!(result.is_ok());
+        let verify_result = result.unwrap();
+        assert_eq!(
+            verify_result.licensed_candidates.len(),
+            2,
+            "Both candidates should be licensed"
+        );
+        assert!(
+            verify_result.unlicensed_candidates.is_empty(),
+            "No candidates should be unlicensed"
+        );
+    }
+
+    #[test]
+    fn test_propose_verify_empty_proposer_output() {
+        // Proposer returns no candidates. propose_verify should return
+        // Err(NoOperatorLicenses) because there are no candidates to license.
+        let proposer = TestProposer::empty();
+        let input = Hyp::unknown();
+        let operators = OperatorSet::new();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let result = propose_verify(&proposer, &operators, &input, &evidence);
+
+        assert!(
+            result.is_err(),
+            "Empty proposer output should result in NoOperatorLicenses"
+        );
+        match result.unwrap_err() {
+            crate::abstain::AbstainReason::NoOperatorLicenses(_) => {
+                // Expected
+            }
+            other => panic!("Expected NoOperatorLicenses, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_propose_verify_with_constraint_filtering() {
+        // Proposer generates {valid} and {invalid (Unstructured)}.
+        // Only {valid} passes propose_and_filter.
+        // {valid} is then checked against operator licensing.
+        let valid_atom = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let invalid_atom = Atom {
+            system: OntologySystem::Unstructured,
+            code: "bad".to_string(),
+            preferred_term: "Invalid".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        let valid_candidate = Hyp::new(vec![valid_atom.clone()]);
+        let invalid_candidate = Hyp::new(vec![invalid_atom]);
+        let proposer = TestProposer::new(vec![valid_candidate.clone(), invalid_candidate]);
+
+        // Operator refines to {valid}
+        let input = Hyp::unknown();
+        let mut operators = OperatorSet::new();
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: valid_atom.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddValid".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let evidence = Evidence::new(vec![], test_provenance());
+        let result = propose_verify(&proposer, &operators, &input, &evidence);
+
+        // Should succeed because the valid candidate is licensed
+        assert!(result.is_ok());
+        let verify_result = result.unwrap();
+        // Only the valid candidate should be in licensed_candidates
+        // (invalid was filtered by propose_and_filter)
+        assert_eq!(verify_result.licensed_candidates.len(), 1);
+    }
+
+    #[test]
+    fn test_propose_verify_audit_trail() {
+        // Verify that licensing_verdicts audit trail is populated correctly.
+        // When some candidates are licensed, verify that audit trail records all verdicts.
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        // Proposer returns {A} and {B}
+        let candidate_a = Hyp::new(vec![atom_a.clone()]);
+        let candidate_b = Hyp::new(vec![atom_b.clone()]);
+        let proposer = TestProposer::new(vec![candidate_a, candidate_b]);
+
+        // Operator produces {A, B}: both atoms
+        let input = Hyp::unknown();
+        let mut operators = OperatorSet::new();
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_a.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddA".to_string(),
+                version: "test".to_string(),
+            },
+        );
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddB".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let evidence = Evidence::new(vec![], test_provenance());
+        let result = propose_verify(&proposer, &operators, &input, &evidence);
+
+        // Should succeed with both candidates licensed
+        assert!(result.is_ok());
+        let verify_result = result.unwrap();
+        // Audit trail should have verdicts for both candidates
+        assert_eq!(verify_result.licensing_verdicts.len(), 2);
+        // Both should be licensed (true in verdicts)
+        assert!(
+            verify_result
+                .licensing_verdicts
+                .iter()
+                .all(|(_, is_licensed, _)| *is_licensed),
+            "Audit trail should show both candidates as licensed"
+        );
     }
 }
