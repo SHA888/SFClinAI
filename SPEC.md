@@ -123,19 +123,19 @@ Two consequences:
 
 ### §0.8. Document structure
 
-| Section | Content                                                       | Status in v0.1.0-draft |
+| Section | Content                                                       | Status in v0.3.0-draft |
 | ------- | ------------------------------------------------------------- | ---------------------- |
-| §0      | Preliminaries (this section)                                  | Initial draft          |
-| §1      | Mathematical preliminaries (order theory, Galois connections) | Pending                |
-| §2      | Patient-state substrate (formalizes `NOTE.md` §4A)            | Pending                |
-| §3      | Institutional-state substrate (formalizes `NOTE.md` §4B)      | Pending                |
-| §4      | Interaction semantics (formalizes `NOTE.md` §4C)              | Pending                |
-| §5      | Temporal evolution (formalizes `NOTE.md` §4D)                 | Pending                |
-| §6      | Consolidated proof obligations                                | Pending                |
-| §7      | Open formal questions and deferred commitments                | Pending                |
-| §8      | Bidirectional traceability `NOTE.md` ↔ SPEC.md                | Pending                |
+| §0      | Preliminaries (this section)                                  | Complete               |
+| §1      | Mathematical preliminaries (order theory, Galois connections) | Complete               |
+| §2      | Patient-state substrate (formalizes `NOTE.md` §4A)            | Complete               |
+| §3      | Institutional-state substrate (formalizes `NOTE.md` §4B)      | Complete               |
+| §4      | Interaction semantics (formalizes `NOTE.md` §4C)              | Complete               |
+| §5      | Temporal evolution (formalizes `NOTE.md` §4D)                 | Complete               |
+| §6      | Consolidated proof obligations                                | Complete               |
+| §7      | Open formal questions and deferred commitments                | Complete               |
+| §8      | Bidirectional traceability `NOTE.md` ↔ SPEC.md                | Complete               |
 
-Sections are drafted in order. Each substrate section (§2–§5) is iterated to stability before the next begins. §6 and §8 are constructed incrementally as §2–§5 grow.
+All sections drafted and under active maintenance. §2–§5 contain 57 named definitions (`DEF-*`), 23 named invariants (`INV-*`), and 17 proof obligations (`OBL-*`). §8 traces all 18 `NOTE.md` §4 principles to SPEC.md definitions with no coverage gaps. See §0.6 (versioning) for change discipline.
 
 ### §0.9. Criticality scheme
 
