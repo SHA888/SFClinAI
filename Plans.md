@@ -46,7 +46,7 @@ The M1 Definition of Done (met, shipped 2026-05-31) and the M1 out-of-scope back
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 8.1 | Define `RefinementProposer` trait signature | `pub trait RefinementProposer { fn propose(&self, h: &Hyp, e: &Evidence) -> Set<Hyp>; }` per DEF-PS-14; doc anchors to SPEC.md §2.7; type signature enforces no decision-making (returns candidates only) | 7.4 | cc:todo |
+| 8.1 | Define `RefinementProposer` trait signature | `pub trait RefinementProposer { fn propose(&self, h: &Hyp, e: &Evidence) -> Set<Hyp>; }` per DEF-PS-14; doc anchors to SPEC.md §2.7; type signature enforces no decision-making (returns candidates only) | 7.4 | cc:done [102a8e9] |
 | 8.2 | Define `ProposerConstraint` validator (input + output gates) | Validates two clauses per DEF-PS-15: (1) candidate must be ontology-bounded (output-side gate); (2) candidate must be at most one operator step from input. Also gates the input side: rejects evidence/hypotheses outside ontology bounds before proposal per M2.1 (Diagram 3 input-side gate). Returns structured error per failed clause for debugging. | 8.1 [tdd:required] | cc:todo |
 | 8.3 | Implement `propose_and_filter` adapter | Wrapper that calls proposer and filters output through `ProposerConstraint`. Returns (valid_candidates, filtered_out_count, filter_errors). Logs filtering decisions for audit trail. | 8.2 [tdd:required] | cc:todo |
 | 8.4 | Write INV-PS-06 proof (proposer cannot bypass soundness) | Informal-argument doc `clinlat/docs/invariants/inv-ps-06-proposer-safety.md`; proves that no proposer output can bypass `OperatorSet.apply_set()` gate; worked example: adversarial proposer vs. sound operator | 8.3 | cc:todo |
