@@ -1355,4 +1355,377 @@ mod tests {
             "Audit trail should show both candidates as licensed"
         );
     }
+
+    // INV-PS-06 Structural Enforcement Test (Task 8.6)
+    // Property-test tier: ≥10 cases demonstrating that no out-of-bounds candidate
+    // can escape the constraint and licensing filters, regardless of proposer behavior.
+
+    /// Adversarial proposer that returns Unstructured atoms (OBL-PS-01 violation)
+    struct UnstructuredProposer;
+    impl RefinementProposer for UnstructuredProposer {
+        fn propose(&self, _h: &Hyp, _e: &Evidence) -> CandidateSet {
+            let mut candidates = CandidateSet::new();
+            candidates.insert(Hyp::new(vec![Atom {
+                system: OntologySystem::Unstructured,
+                code: "bad".to_string(),
+                preferred_term: "Invalid".to_string(),
+                version: "2026-01-31".to_string(),
+            }]));
+            candidates
+        }
+    }
+
+    /// Adversarial proposer that returns empty codes (codec validation)
+    struct EmptyCodeProposer;
+    impl RefinementProposer for EmptyCodeProposer {
+        fn propose(&self, _h: &Hyp, _e: &Evidence) -> CandidateSet {
+            let mut candidates = CandidateSet::new();
+            candidates.insert(Hyp::new(vec![Atom {
+                system: OntologySystem::SNOMED,
+                code: "".to_string(),
+                preferred_term: "Empty Code".to_string(),
+                version: "2026-01-31".to_string(),
+            }]));
+            candidates
+        }
+    }
+
+    /// Adversarial proposer that returns mixed valid+invalid atoms
+    struct MixedProposer;
+    impl RefinementProposer for MixedProposer {
+        fn propose(&self, _h: &Hyp, _e: &Evidence) -> CandidateSet {
+            let mut candidates = CandidateSet::new();
+            candidates.insert(Hyp::new(vec![
+                Atom {
+                    system: OntologySystem::SNOMED,
+                    code: "67822003".to_string(),
+                    preferred_term: "Hypoxemia".to_string(),
+                    version: "2026-01-31".to_string(),
+                },
+                Atom {
+                    system: OntologySystem::Unstructured,
+                    code: "bad".to_string(),
+                    preferred_term: "Invalid".to_string(),
+                    version: "2026-01-31".to_string(),
+                },
+            ]));
+            candidates
+        }
+    }
+
+    /// Adversarial proposer that returns purely unstructured candidates
+    struct PurelyUnstructuredProposer;
+    impl RefinementProposer for PurelyUnstructuredProposer {
+        fn propose(&self, _h: &Hyp, _e: &Evidence) -> CandidateSet {
+            let mut candidates = CandidateSet::new();
+            // Multiple unstructured candidates
+            for i in 0..3 {
+                candidates.insert(Hyp::new(vec![Atom {
+                    system: OntologySystem::Unstructured,
+                    code: format!("bad{}", i),
+                    preferred_term: format!("Invalid {}", i),
+                    version: "2026-01-31".to_string(),
+                }]));
+            }
+            candidates
+        }
+    }
+
+    /// Adversarial proposer that returns non-refining candidates (violates DEF-PS-15 clause 2)
+    struct NonRefiningProposer;
+    impl RefinementProposer for NonRefiningProposer {
+        fn propose(&self, h: &Hyp, _e: &Evidence) -> CandidateSet {
+            let mut candidates = CandidateSet::new();
+            // Return unknown (fewer atoms than input if input has any)
+            if !h.atoms().is_empty() {
+                candidates.insert(Hyp::unknown());
+            }
+            candidates
+        }
+    }
+
+    #[test]
+    fn test_inv_ps_06_unstructured_atoms_filtered() {
+        // Property 1: Unstructured atoms must be filtered by constraint validation
+        let proposer = UnstructuredProposer;
+        let input = Hyp::unknown();
+        let _operators = OperatorSet::new();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let filter_result = propose_and_filter(&proposer, &input, &evidence);
+        assert_eq!(
+            filter_result.valid_candidates.len(),
+            0,
+            "Unstructured atoms must be rejected at constraint stage"
+        );
+        assert!(!filter_result.all_passed(), "Filter should record errors");
+    }
+
+    #[test]
+    fn test_inv_ps_06_empty_codes_filtered() {
+        // Property 2: Empty codes must be filtered by constraint validation
+        let proposer = EmptyCodeProposer;
+        let input = Hyp::unknown();
+        let _operators = OperatorSet::new();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let filter_result = propose_and_filter(&proposer, &input, &evidence);
+        assert_eq!(
+            filter_result.valid_candidates.len(),
+            0,
+            "Empty codes must be rejected at constraint stage"
+        );
+    }
+
+    #[test]
+    fn test_inv_ps_06_mixed_valid_invalid_filtered() {
+        // Property 3: Mixed atom sets with invalid atoms must be fully filtered
+        let proposer = MixedProposer;
+        let input = Hyp::unknown();
+        let _operators = OperatorSet::new();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let filter_result = propose_and_filter(&proposer, &input, &evidence);
+        assert_eq!(
+            filter_result.valid_candidates.len(),
+            0,
+            "Candidates with any Unstructured atoms must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_inv_ps_06_purely_unstructured_proposer_blocked() {
+        // Property 4: Even proposer returning only unstructured atoms is blocked
+        let proposer = PurelyUnstructuredProposer;
+        let input = Hyp::unknown();
+        let _operators = OperatorSet::new();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let filter_result = propose_and_filter(&proposer, &input, &evidence);
+        assert!(
+            filter_result.valid_candidates.is_empty(),
+            "All unstructured candidates must be filtered"
+        );
+        assert_eq!(
+            filter_result.filtered_out_count, 3,
+            "All 3 unstructured candidates rejected"
+        );
+    }
+
+    #[test]
+    fn test_inv_ps_06_non_refining_candidates_filtered() {
+        // Property 5: Non-refining candidates fail the operator-reachable check
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let input = Hyp::new(vec![atom_a]);
+        let proposer = NonRefiningProposer;
+        let _operators = OperatorSet::new();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let filter_result = propose_and_filter(&proposer, &input, &evidence);
+        assert_eq!(
+            filter_result.valid_candidates.len(),
+            0,
+            "Non-refining candidates (Hyp::unknown() when input has atoms) must be filtered"
+        );
+    }
+
+    #[test]
+    fn test_inv_ps_06_empty_proposer_output_safe() {
+        // Property 6: Empty proposer output (no candidates) is safe (no unsound candidates escape)
+        let proposer = TestProposer::empty();
+        let input = Hyp::unknown();
+        let _operators = OperatorSet::new();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let filter_result = propose_and_filter(&proposer, &input, &evidence);
+        assert!(
+            filter_result.valid_candidates.is_empty(),
+            "Empty proposer output means no candidates to filter — structural safety holds"
+        );
+    }
+
+    #[test]
+    fn test_inv_ps_06_propose_verify_rejects_all_unlicensed() {
+        // Property 7: When proposer returns valid but unlicensed candidates,
+        // propose_verify must reject them (no refinement by operator set).
+        // This tests the operator-licensing gate end-to-end.
+
+        struct ValidButUnlicensedProposer;
+        impl RefinementProposer for ValidButUnlicensedProposer {
+            fn propose(&self, _h: &Hyp, _e: &Evidence) -> CandidateSet {
+                let mut candidates = CandidateSet::new();
+                // Valid atom (SNOMED, non-empty), but won't be produced by operators
+                candidates.insert(Hyp::new(vec![Atom {
+                    system: OntologySystem::SNOMED,
+                    code: "999999".to_string(),
+                    preferred_term: "WillNotBeProduced".to_string(),
+                    version: "2026-01-31".to_string(),
+                }]));
+                candidates
+            }
+        }
+
+        let proposer = ValidButUnlicensedProposer;
+        let input = Hyp::unknown();
+        let operators = OperatorSet::new();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        // propose_verify should reject the candidate because it's not licensed
+        let result = propose_verify(&proposer, &operators, &input, &evidence);
+        assert!(
+            result.is_err(),
+            "Valid but unlicensed candidates should be rejected by licensing gate"
+        );
+        match result.unwrap_err() {
+            crate::abstain::AbstainReason::NoOperatorLicenses(_) => {
+                // Expected: licensing gate rejected the unlicensed candidate
+            }
+            other => panic!("Expected NoOperatorLicenses, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_inv_ps_06_full_pipeline_structural_property() {
+        // Property 8: Full pipeline (propose_and_filter → propose_verify) guarantees
+        // only ontology-bounded, operator-licensed hypotheses emerge.
+        // This is the comprehensive structural test covering the end-to-end contract.
+
+        struct AdversarialProposer;
+        impl RefinementProposer for AdversarialProposer {
+            fn propose(&self, _h: &Hyp, _e: &Evidence) -> CandidateSet {
+                let mut candidates = CandidateSet::new();
+                // Try various violations
+                candidates.insert(Hyp::new(vec![Atom {
+                    system: OntologySystem::Unstructured,
+                    code: "free_text".to_string(),
+                    preferred_term: "Should fail".to_string(),
+                    version: "2026-01-31".to_string(),
+                }]));
+                candidates.insert(Hyp::new(vec![Atom {
+                    system: OntologySystem::SNOMED,
+                    code: "".to_string(),
+                    preferred_term: "Empty code".to_string(),
+                    version: "2026-01-31".to_string(),
+                }]));
+                candidates
+            }
+        }
+
+        let proposer = AdversarialProposer;
+        let input = Hyp::unknown();
+        let operators = OperatorSet::new();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        // Step 1: Constraint filtering (propose_and_filter)
+        let filter_result = propose_and_filter(&proposer, &input, &evidence);
+        assert!(
+            filter_result.valid_candidates.is_empty(),
+            "All adversarial candidates should be filtered by constraint validation"
+        );
+
+        // Step 2: Licensing verification (propose_verify) — empty valid_candidates triggers abstention
+        let verify_result = propose_verify(&proposer, &operators, &input, &evidence);
+        assert!(
+            verify_result.is_err(),
+            "propose_verify should abstain when all candidates are filtered"
+        );
+    }
+
+    #[test]
+    fn test_inv_ps_06_input_gate_blocks_invalid_input() {
+        // Property 9: Input-side gate (propose_and_filter's validate_input) blocks
+        // invalid input hypotheses, preventing the proposer from running on bad state.
+
+        let invalid_input = Hyp::new(vec![Atom {
+            system: OntologySystem::Unstructured,
+            code: "bad_input".to_string(),
+            preferred_term: "Invalid input".to_string(),
+            version: "2026-01-31".to_string(),
+        }]);
+
+        let proposer = TestProposer::empty();
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let filter_result = propose_and_filter(&proposer, &invalid_input, &evidence);
+        assert!(
+            filter_result.valid_candidates.is_empty(),
+            "Invalid input hypothesis should be rejected at input-side gate"
+        );
+        assert_eq!(
+            filter_result.filter_errors.len(),
+            1,
+            "Input-side validation failure recorded"
+        );
+    }
+
+    #[test]
+    fn test_inv_ps_06_ontology_bounded_subset_safety() {
+        // Property 10: Even when proposer returns a valid ontology-bounded subset,
+        // if not licensed by operators, it's filtered at the licensing stage.
+
+        struct SubsetProposer {
+            atom: Atom,
+        }
+        impl RefinementProposer for SubsetProposer {
+            fn propose(&self, _h: &Hyp, _e: &Evidence) -> CandidateSet {
+                let mut candidates = CandidateSet::new();
+                candidates.insert(Hyp::new(vec![self.atom.clone()]));
+                candidates
+            }
+        }
+
+        let atom = Atom {
+            system: OntologySystem::RxNorm,
+            code: "99999".to_string(),
+            preferred_term: "NeverProduced".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        let proposer = SubsetProposer { atom: atom.clone() };
+        let input = Hyp::unknown();
+        let mut operators = OperatorSet::new();
+        // Add operator that produces a DIFFERENT atom
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: Atom {
+                    system: OntologySystem::SNOMED,
+                    code: "67822003".to_string(),
+                    preferred_term: "Hypoxemia".to_string(),
+                    version: "2026-01-31".to_string(),
+                },
+            }),
+            OperatorMetadata {
+                name: "AddHypoxemia".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        // Constraint filtering passes (RxNorm is valid)
+        let filter_result = propose_and_filter(&proposer, &input, &evidence);
+        assert_eq!(
+            filter_result.valid_candidates.len(),
+            1,
+            "Valid RxNorm candidate passes constraint filtering"
+        );
+
+        // But licensing gate rejects it (not produced by operators)
+        let verify_result = propose_verify(&proposer, &operators, &input, &evidence);
+        assert!(
+            verify_result.is_err(),
+            "Valid but unlicensed RxNorm candidate must be rejected by licensing gate"
+        );
+        match verify_result.unwrap_err() {
+            crate::abstain::AbstainReason::NoOperatorLicenses(_) => {
+                // Expected: structurally demonstrates two-layer filtering
+            }
+            other => panic!("Expected NoOperatorLicenses, got {:?}", other),
+        }
+    }
 }
