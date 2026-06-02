@@ -547,7 +547,12 @@ pub fn propose_verify(
 
     // Step 1a: Check for input-gate rejection (OBL-PS-01 constraint on input hypothesis)
     // propose_and_filter returns this when validate_input fails (e.g., Unstructured atoms in input)
-    if filter_result.valid_candidates.is_empty() && !filter_result.filter_errors.is_empty() {
+    // Key distinction: filtered_out_count == 0 AND filter_errors non-empty means input-gate failure
+    // filtered_out_count == 0 AND filter_errors empty means proposer ran and returned nothing (normal path)
+    if filter_result.valid_candidates.is_empty()
+        && filter_result.filtered_out_count == 0
+        && !filter_result.filter_errors.is_empty()
+    {
         // Input hypothesis failed ontology-bounded constraint; this is not an operator-licensing failure
         return Err(crate::abstain::AbstainReason::OntologyOutOfScope(
             "input hypothesis is ontology-unbounded (OBL-PS-01 constraint violation)",
@@ -1449,7 +1454,6 @@ mod tests {
         // Property 1: Unstructured atoms must be filtered by constraint validation
         let proposer = UnstructuredProposer;
         let input = Hyp::unknown();
-        let _operators = OperatorSet::new();
         let evidence = Evidence::new(vec![], test_provenance());
 
         let filter_result = propose_and_filter(&proposer, &input, &evidence);
@@ -1634,6 +1638,13 @@ mod tests {
             verify_result.is_err(),
             "propose_verify should abstain when all candidates are filtered"
         );
+        // Verify the correct error type: NoOperatorLicenses (not OntologyOutOfScope)
+        match verify_result.unwrap_err() {
+            crate::abstain::AbstainReason::NoOperatorLicenses(_) => {
+                // Expected: after filtering, no candidates left to license
+            }
+            other => panic!("Expected NoOperatorLicenses, got {:?}", other),
+        }
     }
 
     #[test]
