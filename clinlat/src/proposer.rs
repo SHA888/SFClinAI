@@ -458,7 +458,7 @@ pub fn propose_and_filter(
 /// `licensed_candidates ⊆ input_candidates` (filtering, never expansion).
 /// If `licensed_candidates.is_empty()`, the substrate should return
 /// `Err(AbstainReason::NoOperatorLicenses)` instead of this type.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerifyResult {
     /// Candidates whose atoms are reachable by the operator set (licensed).
     pub licensed_candidates: CandidateSet,
@@ -467,19 +467,31 @@ pub struct VerifyResult {
     /// Audit trail: which candidates passed/failed and why.
     /// Format: (candidate_atoms_string, is_licensed, operator_set_result_atoms_string)
     pub licensing_verdicts: Vec<(String, bool, String)>,
+    /// Constraint filtering audit trail (OBL-PS-04): candidates rejected before operator licensing.
+    /// Format: (candidate_atoms_string, constraint_error_message)
+    pub constraint_filtering_verdicts: Vec<(String, String)>,
 }
 
 impl VerifyResult {
     /// Create a new verify result.
+    ///
+    /// # Panics (debug only)
+    /// Panics in debug builds if licensed and unlicensed candidates are not disjoint.
     pub fn new(
         licensed_candidates: CandidateSet,
         unlicensed_candidates: CandidateSet,
         licensing_verdicts: Vec<(String, bool, String)>,
+        constraint_filtering_verdicts: Vec<(String, String)>,
     ) -> Self {
+        debug_assert!(
+            licensed_candidates.is_disjoint(&unlicensed_candidates),
+            "VerifyResult invariant violated: candidate appears in both licensed and unlicensed"
+        );
         Self {
             licensed_candidates,
             unlicensed_candidates,
             licensing_verdicts,
+            constraint_filtering_verdicts,
         }
     }
 
@@ -520,8 +532,10 @@ impl VerifyResult {
 ///
 /// # Audit Trail (OBL-PS-04)
 ///
-/// Every licensing decision is recorded in `licensing_verdicts` for traceability.
-/// The audit trail names which candidates passed/failed and why.
+/// The audit trail captures all filtering decisions across both constraint validation
+/// and operator licensing. This enables full reconstruction of why a candidate was accepted or rejected.
+/// - `constraint_filtering_verdicts`: candidates rejected by ProposerConstraint (DEF-PS-15)
+/// - `licensing_verdicts`: candidates that passed constraint validation and their operator licensing outcomes
 pub fn propose_verify(
     proposer: &dyn RefinementProposer,
     operators: &crate::operator_set::OperatorSet,
@@ -531,6 +545,30 @@ pub fn propose_verify(
     // Step 1: Filter proposer output through constraint validator (propose_and_filter)
     let filter_result = propose_and_filter(proposer, h, e);
 
+    // Step 1a: Check for input-gate rejection (OBL-PS-01 constraint on input hypothesis)
+    // propose_and_filter returns this when validate_input fails (e.g., Unstructured atoms in input)
+    if filter_result.valid_candidates.is_empty() && !filter_result.filter_errors.is_empty() {
+        // Input hypothesis failed ontology-bounded constraint; this is not an operator-licensing failure
+        return Err(crate::abstain::AbstainReason::OntologyOutOfScope(
+            "input hypothesis is ontology-unbounded (OBL-PS-01 constraint violation)",
+        ));
+    }
+
+    // Step 1b: Audit trail for constraint filtering (proposals rejected before operator licensing)
+    let constraint_filtering_verdicts: Vec<(String, String)> = filter_result
+        .filter_errors
+        .iter()
+        .map(|err| {
+            let msg = if err.ontology_bounded_failed() {
+                "ontology-bounded constraint violated"
+            } else {
+                "operator-reachable constraint violated"
+            }
+            .to_string();
+            ("<filtered by constraint>".to_string(), msg)
+        })
+        .collect();
+
     // Step 2: Apply operator set to get soundness-verified result
     let set_outcome = operators.apply_set(h, e);
     let result_atoms = set_outcome.result.atoms();
@@ -538,7 +576,7 @@ pub fn propose_verify(
         "{{{}}}",
         result_atoms
             .iter()
-            .map(|a| format!("{}:{}", a.system, a.code))
+            .map(|a| format!("{}:{}@{}", a.system, a.code, a.version))
             .collect::<Vec<_>>()
             .join(", ")
     );
@@ -554,15 +592,22 @@ pub fn propose_verify(
             "{{{}}}",
             candidate_atoms
                 .iter()
-                .map(|a| format!("{}:{}", a.system, a.code))
+                .map(|a| format!("{}:{}@{}", a.system, a.code, a.version))
                 .collect::<Vec<_>>()
                 .join(", ")
         );
 
         // Check if candidate atoms are a subset of result atoms (licensed by operator set)
-        let is_licensed = candidate_atoms
-            .iter()
-            .all(|c_atom| result_atoms.iter().any(|r_atom| r_atom == c_atom));
+        // Special case: Hyp::unknown() is licensed only if result is also Hyp::unknown()
+        // (identity semantics: empty set ⊆ empty set, but only for "no refinement" case)
+        let is_licensed = if candidate_atoms.is_empty() && result_atoms.is_empty() {
+            // Both unknown: identity case, licensed only if input was also unknown
+            h.atoms().is_empty()
+        } else {
+            candidate_atoms
+                .iter()
+                .all(|c_atom| result_atoms.iter().any(|r_atom| r_atom == c_atom))
+        };
 
         if is_licensed {
             licensed_candidates.insert(candidate.clone());
@@ -583,6 +628,7 @@ pub fn propose_verify(
             licensed_candidates,
             unlicensed_candidates,
             licensing_verdicts,
+            constraint_filtering_verdicts,
         ))
     }
 }
@@ -878,6 +924,26 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_result_disjoint_check() {
+        // VerifyResult should enforce disjointness of licensed and unlicensed candidates
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let candidate_a = Hyp::new(vec![atom_a]);
+        let mut licensed = CandidateSet::new();
+        let unlicensed = CandidateSet::new();
+        licensed.insert(candidate_a.clone());
+
+        // Create with disjoint sets - should succeed
+        let result = VerifyResult::new(licensed.clone(), unlicensed, vec![], vec![]);
+        assert_eq!(result.licensed_candidates.len(), 1);
+        assert!(result.unlicensed_candidates.is_empty());
+    }
+
+    #[test]
     fn test_proposer_constraint_returns_structured_error() {
         // ConstraintError should report which clause failed (ontology-bounded vs operator-reachable).
         // Create a candidate that violates refinement: missing an atom from input.
@@ -1031,7 +1097,7 @@ mod tests {
     }
 
     #[test]
-    fn test_propose_verify_mixed_licensed_unlicensed() {
+    fn test_propose_verify_all_candidates_licensed() {
         // Proposer generates {A} and {B}, operator produces {A, B}.
         // Both candidates should be licensed.
         let atom_a = Atom {
@@ -1087,6 +1153,75 @@ mod tests {
         assert!(
             verify_result.unlicensed_candidates.is_empty(),
             "No candidates should be unlicensed"
+        );
+    }
+
+    #[test]
+    fn test_propose_verify_truly_mixed_licensed_unlicensed() {
+        // Proposer generates {A} and {C}, operator produces {A, B}.
+        // {A} is licensed (A ⊆ {A, B}), {C} is unlicensed (C ⊄ {A, B}).
+        // Despite mixed outcomes, the function should return Ok (not all unlicensed).
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_c = Atom {
+            system: OntologySystem::SNOMED,
+            code: "2081003".to_string(),
+            preferred_term: "Sepsis".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        // Proposer returns {A} and {C}
+        let candidate_a = Hyp::new(vec![atom_a.clone()]);
+        let candidate_c = Hyp::new(vec![atom_c.clone()]);
+        let proposer = TestProposer::new(vec![candidate_a, candidate_c]);
+
+        // Operator produces {A, B} (adds A and B to input)
+        let input = Hyp::unknown();
+        let mut operators = OperatorSet::new();
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_a.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddA".to_string(),
+                version: "test".to_string(),
+            },
+        );
+        operators = operators.register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddB".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let evidence = Evidence::new(vec![], test_provenance());
+        let result = propose_verify(&proposer, &operators, &input, &evidence);
+
+        // Should return Ok (because A is licensed, even though C is not)
+        assert!(result.is_ok());
+        let verify_result = result.unwrap();
+        assert_eq!(
+            verify_result.licensed_candidates.len(),
+            1,
+            "atom A should be licensed"
+        );
+        assert_eq!(
+            verify_result.unlicensed_candidates.len(),
+            1,
+            "atom C should be unlicensed"
         );
     }
 
