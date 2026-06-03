@@ -251,7 +251,7 @@ pub fn is_consistent_with(h: &Hyp, e: &Evidence) -> bool {
 /// An operator encapsulates sound clinical reasoning (e.g., SOFA-3 respiratory scoring).
 ///
 /// Implements DEF-PS-07 (Operator interface).
-pub trait Operator {
+pub trait Operator: Send + Sync {
     /// Applies the operator to a hypothesis and evidence.
     ///
     /// # Parameters

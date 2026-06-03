@@ -95,6 +95,7 @@ pub mod abstain;
 pub mod curb65;
 pub mod hyp;
 pub mod kdigo_aki;
+pub mod lattice_search;
 pub mod ontology;
 pub mod operator;
 pub mod operator_set;
@@ -109,6 +110,7 @@ pub use abstain::AbstainReason;
 pub use curb65::Curb65Operator;
 pub use hyp::Hyp;
 pub use kdigo_aki::KdigoAkiOperator;
+pub use lattice_search::LatticeSearchProposer;
 pub use ontology::{
     Atom, CacheMode, Icd11Adapter, LoincAdapter, OntologyAdapter, OntologyError, OntologySystem,
     RxNormAdapter, SNOMEDAdapter,

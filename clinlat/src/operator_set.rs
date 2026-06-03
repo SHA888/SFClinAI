@@ -87,6 +87,17 @@ impl OperatorSet {
             .collect()
     }
 
+    /// Returns an iterator over references to the registered operators.
+    ///
+    /// This allows proposers (e.g., lattice search) to invoke each operator
+    /// individually and collect refinements, rather than using the propagate-forward
+    /// semantics of `apply_set`.
+    pub fn iter_operators(&self) -> impl Iterator<Item = &dyn Operator> {
+        self.operators_and_metadata
+            .iter()
+            .map(|(op, _)| op.as_ref())
+    }
+
     /// Applies all operators in sequence, propagating refinements forward.
     ///
     /// **Algorithm:**
