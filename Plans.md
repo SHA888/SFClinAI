@@ -61,7 +61,7 @@ The M1 Definition of Done (met, shipped 2026-05-31) and the M1 out-of-scope back
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 9.1 | Implement `LatticeSearchProposer` | Exhaustive breadth-first search of all hypotheses reachable from input via single operator application. Returns all valid candidates per DEF-PS-15. For small operator sets (≤5 operators), search terminates quickly; for larger sets, implement pruning heuristics (e.g., halt at depth N or candidate count threshold). | 8.1, 4.2 [tdd:required] | cc:todo |
+| 9.1 | Implement `LatticeSearchProposer` | Exhaustive breadth-first search of all hypotheses reachable from input via single operator application. Returns all valid candidates per DEF-PS-15. For small operator sets (≤5 operators), search terminates quickly; for larger sets, implement pruning heuristics (e.g., halt at depth N or candidate count threshold). | 8.1, 4.2 [tdd:required] | cc:done [7bfdd94] |
 | 9.2 | Property-test `LatticeSearchProposer` completeness | Verify: (1) every hypothesis reachable by one operator application is in the output set; (2) output set is minimal (no spurious candidates); (3) monotonicity of refinement within result set. ≥10 property cases per (1), (2), (3). | 9.1 [tdd:required] | cc:todo |
 | 9.3 | Worked example: SOFA + KDIGO proposer | Use `LatticeSearchProposer` with {SofaRespOperator, KdigoAkiOperator} on a sepsis-3 patient state. Show how lattice search generates candidate refinements (SOFA stage 2 + KDIGO Stage 1, etc.). | 9.2 | cc:todo |
 
