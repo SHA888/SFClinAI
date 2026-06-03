@@ -251,6 +251,12 @@ pub fn is_consistent_with(h: &Hyp, e: &Evidence) -> bool {
 /// An operator encapsulates sound clinical reasoning (e.g., SOFA-3 respiratory scoring).
 ///
 /// Implements DEF-PS-07 (Operator interface).
+///
+/// # Thread Safety
+///
+/// All operators must be `Send + Sync`. This requirement ensures that operators can be
+/// safely composed in proposers (e.g., `LatticeSearchProposer`) that implement `RefinementProposer`,
+/// which itself must be `Send + Sync` for use in concurrent clinical decision systems.
 pub trait Operator: Send + Sync {
     /// Applies the operator to a hypothesis and evidence.
     ///

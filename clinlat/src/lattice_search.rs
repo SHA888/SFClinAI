@@ -61,9 +61,6 @@ impl RefinementProposer for LatticeSearchProposer {
     fn propose(&self, h: &Hyp, e: &Evidence) -> CandidateSet {
         let mut candidates = CandidateSet::new();
 
-        // Iterate over each operator and collect refinements.
-        // To do this, we need access to individual operators, not just apply_set.
-        // For now, this is a placeholder; we'll need to add an iterator to OperatorSet.
         for op in self.operators.iter_operators() {
             match op.apply(h, e) {
                 Outcome::Refined(h_prime) => {
@@ -78,7 +75,9 @@ impl RefinementProposer for LatticeSearchProposer {
         // Apply pruning if max_candidates is set
         if let Some(max) = self.max_candidates {
             if candidates.len() > max {
-                // Truncate to max_candidates (deterministic: keep first max)
+                // Truncate to max_candidates. Note: HashSet iteration order is undefined,
+                // so the actual subset returned may vary across runs. This is acceptable
+                // for proposer output (downstream soundness verification is order-independent).
                 candidates = candidates.into_iter().take(max).collect();
             }
         }
