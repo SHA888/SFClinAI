@@ -17,5 +17,9 @@ serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 flate2 = "1"
 
+[[example]]
+name = "sofa_kdigo_proposer"
+path = "examples/sofa_kdigo_proposer.rs"
+
 [dev-dependencies]
 proptest = "1"
