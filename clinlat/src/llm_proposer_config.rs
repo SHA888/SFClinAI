@@ -100,11 +100,11 @@ impl LlmProvider {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct LlmProposerConfig {
     /// LLM provider endpoint.
-    pub provider: LlmProvider,
+    provider: LlmProvider,
 
     /// Model identifier (e.g., "gpt-4-turbo", "claude-opus-4-8").
     /// Must be a valid model name for the chosen provider.
-    pub model: String,
+    model: String,
 
     /// Prompt template for constructing the LLM prompt.
     /// Should contain placeholders like {hypothesis} and {evidence} that will be
@@ -120,28 +120,28 @@ pub struct LlmProposerConfig {
     ///
     /// Suggest refinements (comma-separated SNOMED codes):
     /// ```
-    pub prompt_template: String,
+    prompt_template: String,
 
     /// Maximum tokens in the LLM response.
     /// Typical range: 100–500 (for diagnostic refinement suggestions).
-    pub max_tokens: usize,
+    max_tokens: usize,
 
     /// Sampling temperature (0.0 = deterministic, 1.0+ = random).
     /// - 0.0: Always pick the highest-probability token (deterministic)
     /// - 0.7: Default; balanced randomness
     /// - 1.0+: High randomness; useful for generating diverse hallucinations in testing
-    pub temperature: f32,
+    temperature: f32,
 
     /// Optional seed for reproducible sampling (if provider supports it).
     /// When set, the same input should produce the same output across runs
     /// (provider permitting).
-    pub seed: Option<u64>,
+    seed: Option<u64>,
 
     /// Version identifier for this config (e.g., "0.1.0", "0.2.0").
     /// Incremented when model, prompt, or parameters change materially.
     /// Used in Evidence provenance (INV-PS-05) to track which version of the
     /// LLM made which refinement suggestion.
-    pub version: String,
+    version: String,
 
     /// Predetermined responses for mock mode (testing).
     /// When `provider == Mock`, `LlmProposer` will return these responses
@@ -155,11 +155,12 @@ pub struct LlmProposerConfig {
     /// - Valid refinements (pass `ProposerConstraint`)
     /// - Invalid/hallucinated (fail constraint, filtered silently)
     /// - Edge cases (non-existent SOFA bands, etc.)
-    pub mock_responses: Option<Vec<String>>,
+    mock_responses: Option<Vec<String>>,
 }
 
 impl LlmProposerConfig {
     /// Create a new LLM proposer config with required parameters.
+    /// Does NOT validate; call validate() after construction to check constraints.
     pub fn new(
         provider: LlmProvider,
         model: impl Into<String>,
@@ -178,6 +179,46 @@ impl LlmProposerConfig {
             version: version.into(),
             mock_responses: None,
         }
+    }
+
+    /// Returns a reference to the provider.
+    pub fn provider(&self) -> &LlmProvider {
+        &self.provider
+    }
+
+    /// Returns a reference to the model identifier.
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
+    /// Returns a reference to the prompt template.
+    pub fn prompt_template(&self) -> &str {
+        &self.prompt_template
+    }
+
+    /// Returns the maximum tokens.
+    pub fn max_tokens(&self) -> usize {
+        self.max_tokens
+    }
+
+    /// Returns the sampling temperature.
+    pub fn temperature(&self) -> f32 {
+        self.temperature
+    }
+
+    /// Returns the random seed (if set).
+    pub fn seed(&self) -> Option<u64> {
+        self.seed
+    }
+
+    /// Returns a reference to the version identifier.
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    /// Returns a reference to the mock responses (if set).
+    pub fn mock_responses(&self) -> Option<&Vec<String>> {
+        self.mock_responses.as_ref()
     }
 
     /// Create a new OpenAI proposer config.
@@ -285,15 +326,59 @@ impl LlmProposerConfig {
             return Err("model name cannot be empty".to_string());
         }
 
-        // Check temperature is in valid range (typically [0.0, 2.0])
-        if self.temperature < 0.0 || self.temperature > 2.0 {
-            return Err(format!(
-                "temperature {} out of range [0.0, 2.0]",
-                self.temperature
-            ));
+        // Check prompt template is not empty and contains required placeholders (for non-mock)
+        if !self.is_mock() {
+            if self.prompt_template.is_empty() {
+                return Err("prompt_template cannot be empty".to_string());
+            }
+            // Warn about missing placeholders (but don't fail; proposer can customize as needed)
+            if !self.prompt_template.contains("{hypothesis}") {
+                return Err(
+                    "prompt_template should contain {hypothesis} placeholder for LlmProposer"
+                        .to_string(),
+                );
+            }
+            if !self.prompt_template.contains("{evidence}") {
+                return Err(
+                    "prompt_template should contain {evidence} placeholder for LlmProposer"
+                        .to_string(),
+                );
+            }
         }
 
-        // Check max_tokens is positive
+        // Check provider-specific temperature ranges
+        match &self.provider {
+            LlmProvider::OpenAI => {
+                if self.temperature < 0.0 || self.temperature > 2.0 {
+                    return Err(format!(
+                        "OpenAI temperature {} out of range [0.0, 2.0]",
+                        self.temperature
+                    ));
+                }
+            }
+            LlmProvider::Anthropic => {
+                if self.temperature < 0.0 || self.temperature > 1.0 {
+                    return Err(format!(
+                        "Anthropic temperature {} out of range [0.0, 1.0]",
+                        self.temperature
+                    ));
+                }
+            }
+            LlmProvider::Custom { .. } => {
+                // Custom endpoint; allow [0.0, 2.0] as a reasonable range
+                if self.temperature < 0.0 || self.temperature > 2.0 {
+                    return Err(format!(
+                        "temperature {} out of range [0.0, 2.0]",
+                        self.temperature
+                    ));
+                }
+            }
+            LlmProvider::Mock => {
+                // Mock mode is deterministic
+            }
+        }
+
+        // Check max_tokens is positive (except mock mode)
         if self.max_tokens == 0 && !self.is_mock() {
             return Err("max_tokens must be positive (except in mock mode)".to_string());
         }
@@ -306,10 +391,17 @@ impl LlmProposerConfig {
             return Err("mock mode requires at least one response in mock_responses".to_string());
         }
 
-        // Check custom endpoint is not empty
+        // Check custom endpoint is not empty and has a valid URL scheme
         if let LlmProvider::Custom { endpoint } = &self.provider {
             if endpoint.is_empty() {
                 return Err("custom endpoint cannot be empty".to_string());
+            }
+            if !endpoint.starts_with("http://") && !endpoint.starts_with("https://") {
+                return Err(
+                    "custom endpoint must start with http:// or https:// (got: {})"
+                        .to_string()
+                        .replace("{}", endpoint),
+                );
             }
         }
 
@@ -360,23 +452,42 @@ mod tests {
 
     #[test]
     fn test_config_validation() {
-        // Valid config
-        let config = LlmProposerConfig::openai("gpt-4", "prompt", 256, 0.7, "0.1.0");
+        // Valid config with required placeholders
+        let config = LlmProposerConfig::openai(
+            "gpt-4",
+            "Given hypothesis: {hypothesis}, evidence: {evidence}",
+            256,
+            0.7,
+            "0.1.0",
+        );
         assert!(config.validate().is_ok());
 
-        // Invalid: empty model
-        let mut config = LlmProposerConfig::openai("gpt-4", "prompt", 256, 0.7, "0.1.0");
-        config.model = String::new();
+        // Invalid: missing {hypothesis} placeholder
+        let config = LlmProposerConfig::openai("gpt-4", "evidence: {evidence}", 256, 0.7, "0.1.0");
         assert!(config.validate().is_err());
 
-        // Invalid: temperature out of range
-        let mut config = LlmProposerConfig::openai("gpt-4", "prompt", 256, 0.7, "0.1.0");
-        config.temperature = 3.0;
+        // Invalid: missing {evidence} placeholder
+        let config =
+            LlmProposerConfig::openai("gpt-4", "hypothesis: {hypothesis}", 256, 0.7, "0.1.0");
+        assert!(config.validate().is_err());
+
+        // Invalid: Anthropic temperature too high
+        let config = LlmProposerConfig::anthropic(
+            "claude-opus",
+            "Given hypothesis: {hypothesis}, evidence: {evidence}",
+            256,
+            1.5,
+            "0.1.0",
+        );
         assert!(config.validate().is_err());
 
         // Invalid: mock mode without responses
         let config = LlmProposerConfig::mock("mock", vec![], "0.1.0");
         assert!(config.validate().is_err());
+
+        // Valid: mock mode with responses
+        let config = LlmProposerConfig::mock("mock", vec!["resp1".to_string()], "0.1.0");
+        assert!(config.validate().is_ok());
     }
 
     #[test]
