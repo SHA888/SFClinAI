@@ -93,10 +93,30 @@ impl LlmProposer {
     /// Construct a prompt from hypothesis and evidence.
     ///
     /// Substitutes `{hypothesis}` and `{evidence}` placeholders in the template
-    /// with formatted versions of `h` and `e`.
+    /// with clinical-structured representations of `h` and `e`.
+    ///
+    /// Uses a simple structured format: atoms are listed as "SYSTEM:CODE@VERSION",
+    /// separated by commas. This is clearer than Debug output and suitable for LLM input.
     fn construct_prompt(&self, h: &Hyp, e: &Evidence) -> String {
-        let hypothesis_str = format!("{:?}", h);
-        let evidence_str = format!("{:?}", e);
+        // Format hypothesis as comma-separated atoms: "SNOMED:12345@2026-01-31, RxNorm:9999@2026-01-31"
+        let hypothesis_str = h
+            .atoms()
+            .iter()
+            .map(|atom| format!("{}:{}@{}", atom.system, atom.code, atom.version))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let hypothesis_str = if hypothesis_str.is_empty() {
+            "unknown".to_string()
+        } else {
+            hypothesis_str
+        };
+
+        // Format evidence as structured text (future: use JSON or structured format)
+        let evidence_str = format!(
+            "observations: {} (build: {})",
+            e.observations.len(),
+            e.provenance.version.build
+        );
 
         self.config
             .prompt_template()
@@ -132,12 +152,19 @@ impl LlmProposer {
 
     /// Parse an LLM response string into candidate hypotheses.
     ///
-    /// Expected format: comma-separated ontology references, e.g.
-    /// "SNOMED:12345,SNOMED:67890" or "SNOMED:12345|RxNorm:9999"
+    /// # Expected format
+    /// Comma/pipe/semicolon-separated ontology references.
+    /// - `"SNOMED:12345,SNOMED:67890"` → two separate candidates
+    /// - `"SNOMED:12345|RxNorm:9999"` → two separate candidates
+    /// - `"SNOMED:12345@2026-01-31"` → with explicit version
     ///
-    /// Each candidate is parsed as a hypothesis (potentially multi-atom).
-    /// Parsing failures (malformed atoms, unrecognized systems) are recorded
-    /// as hallucinations and excluded from the candidate set.
+    /// Each atom becomes a single-candidate hypothesis (multi-atom refinements not supported).
+    /// Parsing failures (malformed atoms, unrecognized systems) are recorded as hallucinations
+    /// and excluded from the candidate set (silent filtering per INV-PS-06).
+    ///
+    /// # Note
+    /// This format is shared with parse_atom(). If other proposers need similar parsing,
+    /// consider extracting this to a shared format parser in the ontology or util module.
     fn parse_response(&self, response: &str) -> ParseResult {
         let mut valid_candidates = Vec::new();
 
