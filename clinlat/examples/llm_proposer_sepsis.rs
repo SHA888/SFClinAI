@@ -105,7 +105,9 @@ fn main() {
         // Simulated LLM response: includes both valid candidates and hallucinations
         // Format: comma-separated atoms that the LLM might produce
         "SNOMED:76948002,UNKNOWN_SYSTEM:99999,SNOMED:,LOINC:8480-6,SOFA-99".to_string(),
-        // Second response for propose_verify stage (constraint + operator licensing)
+        // Second response for propose_and_filter stage (constraint filtering)
+        "SNOMED:76948002,UNKNOWN_SYSTEM:99999,SNOMED:,LOINC:8480-6,SOFA-99".to_string(),
+        // Third response for propose_verify stage (operator licensing)
         "SNOMED:76948002,UNKNOWN_SYSTEM:99999,SNOMED:,LOINC:8480-6,SOFA-99".to_string(),
     ];
 
