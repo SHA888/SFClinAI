@@ -153,12 +153,12 @@ impl LlmProposer {
     /// Parse an LLM response string into candidate hypotheses.
     ///
     /// # Expected format
-    /// Comma/pipe/semicolon-separated ontology references.
-    /// - `"SNOMED:12345,SNOMED:67890"` → two separate candidates
-    /// - `"SNOMED:12345|RxNorm:9999"` → two separate candidates
+    /// Line-separated candidates; atoms within a candidate separated by commas.
+    /// - `"SNOMED:12345, SNOMED:67890"` → single candidate with two atoms
+    /// - `"SNOMED:12345\nSNOMED:67890"` → two separate single-atom candidates
     /// - `"SNOMED:12345@2026-01-31"` → with explicit version
     ///
-    /// Each atom becomes a single-candidate hypothesis (multi-atom refinements not supported).
+    /// Multi-atom hypotheses are supported: atoms separated by commas form one hypothesis.
     /// Parsing failures (malformed atoms, unrecognized systems) are recorded as hallucinations
     /// and excluded from the candidate set (silent filtering per INV-PS-06).
     ///
@@ -168,19 +168,46 @@ impl LlmProposer {
     fn parse_response(&self, response: &str) -> ParseResult {
         let mut valid_candidates = Vec::new();
 
-        // Split by comma, semicolon, or pipe
-        let parts: Vec<&str> = response
-            .split(|c| [',', ';', '|'].contains(&c))
+        // First, split by newline to get separate candidate lines
+        let lines: Vec<&str> = response
+            .lines()
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .collect();
 
-        for part in parts {
-            // Parse each atom; silently discard failures (hallucinations)
-            if let Ok(atom) = self.parse_atom(part) {
-                valid_candidates.push(Hyp::new(vec![atom]));
+        // If no newlines, treat entire response as single candidate (atoms separated by commas)
+        let candidates_to_parse = if lines.is_empty() {
+            vec![response]
+        } else {
+            lines
+        };
+
+        for candidate_str in candidates_to_parse {
+            // Split atoms by comma, pipe, or semicolon
+            let atom_strs: Vec<&str> = candidate_str
+                .split(|c| [',', ';', '|'].contains(&c))
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            let mut atoms = Vec::new();
+
+            for atom_str in atom_strs {
+                // Parse each atom; silently discard failures (hallucinations)
+                match self.parse_atom(atom_str) {
+                    Ok(atom) => atoms.push(atom),
+                    Err(_) => {
+                        // Hallucination detected; skip this atom
+                    }
+                }
             }
-            // Hallucinations are logged nowhere (demonstrate INV-PS-06: system is sound regardless)
+
+            // Only add candidate if at least one atom was successfully parsed
+            if !atoms.is_empty() {
+                valid_candidates.push(Hyp::new(atoms));
+            }
+            // If candidate had errors but some atoms parsed, that's still valid (partial parsing)
+            // If candidate had all atoms fail, it's a complete hallucination and dropped
         }
 
         ParseResult { valid_candidates }
@@ -302,7 +329,7 @@ mod tests {
 
     #[test]
     fn test_llm_proposer_parses_comma_separated_atoms() {
-        // Mock response with multiple comma-separated atoms
+        // Mock response with multiple comma-separated atoms (single candidate with multiple atoms)
         let config = LlmProposerConfig::mock(
             "mock-model",
             vec!["SNOMED:12345,SNOMED:67890".to_string()],
@@ -316,8 +343,8 @@ mod tests {
         let candidates = proposer.propose(&h, &e);
         assert_eq!(
             candidates.len(),
-            2,
-            "Should parse two comma-separated atoms"
+            1,
+            "Should parse comma-separated atoms as single multi-atom candidate"
         );
     }
 
@@ -394,12 +421,16 @@ mod tests {
         let e = Evidence::new(vec![], test_provenance());
 
         let candidates = proposer.propose(&h, &e);
-        assert_eq!(candidates.len(), 2, "Should parse pipe-separated atoms");
+        assert_eq!(
+            candidates.len(),
+            1,
+            "Should parse pipe-separated atoms as single candidate"
+        );
     }
 
     #[test]
     fn test_llm_proposer_parses_semicolon_separated_atoms() {
-        // Mock response with semicolon-separated atoms (alternative delimiter)
+        // Mock response with semicolon-separated atoms (alternative delimiter for atoms in one candidate)
         let config = LlmProposerConfig::mock(
             "mock-model",
             vec!["SNOMED:12345;LOINC:8480-6".to_string()],
@@ -413,8 +444,8 @@ mod tests {
         let candidates = proposer.propose(&h, &e);
         assert_eq!(
             candidates.len(),
-            2,
-            "Should parse semicolon-separated atoms"
+            1,
+            "Should parse semicolon-separated atoms as single candidate"
         );
     }
 
@@ -544,8 +575,8 @@ mod tests {
         let candidates = proposer.propose(&h, &e);
         assert_eq!(
             candidates.len(),
-            4,
-            "Should parse atoms from all supported ontology systems"
+            1,
+            "Should parse atoms from all supported ontology systems (as single candidate)"
         );
     }
 
@@ -563,7 +594,11 @@ mod tests {
         let e = Evidence::new(vec![], test_provenance());
 
         let candidates = proposer.propose(&h, &e);
-        assert_eq!(candidates.len(), 2, "Should handle whitespace correctly");
+        assert_eq!(
+            candidates.len(),
+            1,
+            "Should handle whitespace correctly (multi-atom candidate)"
+        );
     }
 
     #[test]
@@ -580,12 +615,19 @@ mod tests {
         let e = Evidence::new(vec![], test_provenance());
 
         let candidates = proposer.propose(&h, &e);
-        // Should have 2 valid atoms (SNOMED:12345, RxNorm:8888)
-        // MALFORMED and UNKNOWN:9999 should be filtered
+        // Should have 1 candidate with 2 valid atoms (SNOMED:12345, RxNorm:8888)
+        // MALFORMED and UNKNOWN:9999 should be filtered at parse time
         assert_eq!(
             candidates.len(),
+            1,
+            "Should filter all hallucinations and return only valid atoms (1 multi-atom candidate)"
+        );
+        // Verify it has 2 atoms
+        let candidate = candidates.iter().next().unwrap();
+        assert_eq!(
+            candidate.atoms().len(),
             2,
-            "Should filter all hallucinations and return only valid atoms"
+            "Candidate should have 2 valid atoms"
         );
     }
 
@@ -858,15 +900,19 @@ mod tests {
             let filter_result = crate::proposer::propose_and_filter(&proposer, &h_input, &e);
 
             // Invariant P1: Only valid, parsed candidates are returned after filtering
-            // Valid ones: SNOMED:76948002, SNOMED:67890, RxNorm:6809 (3 total)
+            // Valid atoms: SNOMED:76948002, SNOMED:67890, RxNorm:6809 (parsed into 1 multi-atom candidate)
             // Hallucinations (INVALID:XYZ789, SNOMED:) are silently dropped during parsing
             assert_eq!(
                 filter_result.valid_candidates.len(),
-                3,
-                "Should have 3 valid parsed candidates"
+                1,
+                "Should have 1 valid parsed candidate (multi-atom)"
             );
             assert_eq!(filter_result.filtered_out_count, 0); // No additional filtering at constraint stage
             // (all parsed candidates are valid)
+
+            // Verify the candidate has 3 atoms
+            let candidate = filter_result.valid_candidates.iter().next().unwrap();
+            assert_eq!(candidate.atoms().len(), 3, "Candidate should have 3 atoms");
 
             // Invariant P2: Candidates are all valid (no Unstructured, no empty codes)
             for candidate in filter_result.valid_candidates.iter() {
@@ -909,8 +955,16 @@ mod tests {
 
             let filter_result = crate::proposer::propose_and_filter(&proposer, &h_input, &e);
 
-            // Despite garbage, only valid candidates emerge (2: SNOMED:12345, RxNorm:5678)
-            assert_eq!(filter_result.valid_candidates.len(), 2);
+            // Despite garbage, only valid candidates emerge (1 multi-atom candidate with 2 atoms)
+            assert_eq!(filter_result.valid_candidates.len(), 1);
+
+            // Verify the candidate has 2 atoms
+            let candidate = filter_result.valid_candidates.iter().next().unwrap();
+            assert_eq!(
+                candidate.atoms().len(),
+                2,
+                "Candidate should have 2 atoms (SNOMED:12345, RxNorm:5678)"
+            );
 
             // System doesn't crash - robustness property verified
             // Hallucinations are silently dropped at parse time, not logged at filter time

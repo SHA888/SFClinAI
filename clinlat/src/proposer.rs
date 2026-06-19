@@ -1739,4 +1739,592 @@ mod tests {
             other => panic!("Expected NoOperatorLicenses, got {:?}", other),
         }
     }
+
+    // ========== Substrate-Invariance Tests (Task 11.2) ==========
+    // Property: substrate refinement is independent of proposer architecture.
+    // Feed identical evidence through two different proposers; assert identical
+    // post-soundness-gate outcomes.
+
+    use crate::lattice_search::LatticeSearchProposer;
+    use crate::llm_proposer::LlmProposer;
+    use crate::llm_proposer_config::LlmProposerConfig;
+
+    #[test]
+    fn test_substrate_invariance_paired_proposers_simple_case() {
+        // Property 1: Two proposers on same input → identical licensed candidates
+        // Setup: simple hypothesis with one atom, one operator
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        let input = Hyp::new(vec![atom_a.clone()]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        // Build operator set for LatticeSearch (for constructing proposer)
+        let operators_for_proposer = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+        let lattice_proposer = LatticeSearchProposer::new(operators_for_proposer);
+
+        // Build identical operator set for soundness verification (LatticeSearch verification)
+        let operators_verify1 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        // Build operator set for LlmProposer verification
+        let operators_verify2 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        // Proposer 2: LlmProposer (mock)
+        let expected_candidate_str = format!(
+            "SNOMED:{}@2026-01-31, SNOMED:{}@2026-01-31",
+            atom_a.code, atom_b.code
+        );
+        let config = LlmProposerConfig::mock("test-model", vec![expected_candidate_str], "0.1.0");
+        let llm_proposer = LlmProposer::new(config);
+
+        // Run both through propose_verify with equivalent operator sets
+        let result_lattice =
+            propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
+
+        assert!(
+            result_lattice.is_ok(),
+            "LatticeSearchProposer should succeed"
+        );
+        assert!(result_llm.is_ok(), "LlmProposer should succeed");
+
+        let verify_lattice = result_lattice.unwrap();
+        let verify_llm = result_llm.unwrap();
+
+        assert_eq!(
+            verify_lattice.licensed_candidates, verify_llm.licensed_candidates,
+            "Substrate-invariance: identical input → identical licensed candidates"
+        );
+    }
+
+    #[test]
+    fn test_substrate_invariance_both_hallucinate_differently() {
+        // Property 2: Even when LLM hallucinates differently,
+        // post-soundness-gate outcome is the same (hallucinations are filtered)
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_hallucination = Atom {
+            system: OntologySystem::SNOMED,
+            code: "999999".to_string(),
+            preferred_term: "NonExistent".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        let input = Hyp::new(vec![atom_a.clone()]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        // Proposer 1: LatticeSearchProposer (produces only reachable candidates)
+        let operators_for_proposer = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+        let lattice_proposer = LatticeSearchProposer::new(operators_for_proposer);
+
+        // Proposer 2: LlmProposer (mock: returns valid candidate + hallucination)
+        let valid_response = format!(
+            "SNOMED:{}@2026-01-31, SNOMED:{}@2026-01-31",
+            atom_a.code, atom_b.code
+        );
+        let hallucination_response = format!("SNOMED:{}@2026-01-31", atom_hallucination.code);
+        let config = LlmProposerConfig::mock(
+            "test-model",
+            vec![valid_response, hallucination_response],
+            "0.1.0",
+        );
+        let llm_proposer = LlmProposer::new(config);
+
+        // Build identical operator sets for licensing
+        let operators_verify1 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let operators_verify2 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let result_lattice =
+            propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
+
+        assert!(result_lattice.is_ok());
+        assert!(result_llm.is_ok());
+
+        let verify_lattice = result_lattice.unwrap();
+        let verify_llm = result_llm.unwrap();
+
+        assert_eq!(
+            verify_lattice.licensed_candidates, verify_llm.licensed_candidates,
+            "Even with LLM hallucinations, licensed candidates are identical (hallucinations filtered)"
+        );
+    }
+
+    #[test]
+    fn test_substrate_invariance_multiple_paired_cases() {
+        // Property 3: Substrate invariance holds across multiple cases (≥10 pairs)
+        let atom_base = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        // Generate 10 atoms for paired testing
+        let atoms_to_test: Vec<Atom> = (0..10)
+            .map(|i| Atom {
+                system: OntologySystem::SNOMED,
+                code: format!("{}", 100 + i),
+                preferred_term: format!("TestAtom{}", i),
+                version: "2026-01-31".to_string(),
+            })
+            .collect();
+
+        let input = Hyp::new(vec![atom_base.clone()]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        for (i, atom) in atoms_to_test.iter().enumerate() {
+            // Build operator set for proposer
+            let operators_for_proposer = OperatorSet::new().register(
+                Box::new(RefiningOperatorFixture {
+                    atom_to_add: atom.clone(),
+                }),
+                OperatorMetadata {
+                    name: format!("OpAdd{}", i),
+                    version: "test".to_string(),
+                },
+            );
+
+            let lattice_proposer = LatticeSearchProposer::new(operators_for_proposer);
+
+            // Mock LLM with the same expected response
+            let expected_response = format!(
+                "SNOMED:{}@2026-01-31, SNOMED:{}@2026-01-31",
+                atom_base.code, atom.code
+            );
+            let config = LlmProposerConfig::mock("test-model", vec![expected_response], "0.1.0");
+            let llm_proposer = LlmProposer::new(config);
+
+            // Build identical operator sets for licensing
+            let operators_verify1 = OperatorSet::new().register(
+                Box::new(RefiningOperatorFixture {
+                    atom_to_add: atom.clone(),
+                }),
+                OperatorMetadata {
+                    name: format!("OpAdd{}", i),
+                    version: "test".to_string(),
+                },
+            );
+
+            let operators_verify2 = OperatorSet::new().register(
+                Box::new(RefiningOperatorFixture {
+                    atom_to_add: atom.clone(),
+                }),
+                OperatorMetadata {
+                    name: format!("OpAdd{}", i),
+                    version: "test".to_string(),
+                },
+            );
+
+            let result_lattice =
+                propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+            let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
+
+            assert!(
+                result_lattice.is_ok(),
+                "Case {}: LatticeSearch should succeed",
+                i
+            );
+            assert!(result_llm.is_ok(), "Case {}: LlmProposer should succeed", i);
+
+            let verify_lattice = result_lattice.unwrap();
+            let verify_llm = result_llm.unwrap();
+
+            assert_eq!(
+                verify_lattice.licensed_candidates, verify_llm.licensed_candidates,
+                "Case {}: licensed candidates must match",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_substrate_invariance_both_abstain_no_candidates() {
+        // Property 4: When both proposers produce no candidates, both abstain identically
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        let input = Hyp::new(vec![atom_a]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        // Operator set for proposer
+        let operators_for_proposer = OperatorSet::new();
+
+        // Proposer 1: LatticeSearch on empty operator set → empty output
+        let lattice_proposer = LatticeSearchProposer::new(operators_for_proposer);
+
+        // Proposer 2: LLM mock with empty response → empty output
+        let config = LlmProposerConfig::mock(
+            "test-model",
+            vec!["".to_string()], // Empty response (no candidates)
+            "0.1.0",
+        );
+        let llm_proposer = LlmProposer::new(config);
+
+        let operators_verify1 = OperatorSet::new();
+        let operators_verify2 = OperatorSet::new();
+        let result_lattice =
+            propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
+
+        // Both should abstain (Err with NoOperatorLicenses)
+        assert!(
+            result_lattice.is_err(),
+            "LatticeSearch on empty operators should abstain"
+        );
+        assert!(
+            result_llm.is_err(),
+            "LlmProposer on empty operators should abstain"
+        );
+
+        match (result_lattice.unwrap_err(), result_llm.unwrap_err()) {
+            (
+                crate::abstain::AbstainReason::NoOperatorLicenses(_),
+                crate::abstain::AbstainReason::NoOperatorLicenses(_),
+            ) => {
+                // Expected: both abstain for the same reason
+            }
+            other => panic!(
+                "Expected both to abstain with NoOperatorLicenses, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn test_substrate_invariance_llm_mixed_valid_invalid_responses() {
+        // Property 5: LLM returning mix of valid and invalid candidates
+        // → valid candidates licensed, invalid filtered → identical to deterministic
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        let input = Hyp::new(vec![atom_a.clone()]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        // Operator set for proposer
+        let operators_for_proposer = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let lattice_proposer = LatticeSearchProposer::new(operators_for_proposer);
+
+        // LLM mock with:
+        // - Valid response: correct candidate
+        // - Invalid response: unstructured atom (will be filtered)
+        let valid_response = format!(
+            "SNOMED:{}@2026-01-31, SNOMED:{}@2026-01-31",
+            atom_a.code, atom_b.code
+        );
+        let invalid_response = "Unstructured free text that won't parse".to_string();
+
+        let config = LlmProposerConfig::mock(
+            "test-model",
+            vec![valid_response, invalid_response],
+            "0.1.0",
+        );
+        let llm_proposer = LlmProposer::new(config);
+
+        let operators_verify1 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let operators_verify2 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let result_lattice =
+            propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
+
+        assert!(result_lattice.is_ok());
+        assert!(result_llm.is_ok());
+
+        let verify_lattice = result_lattice.unwrap();
+        let verify_llm = result_llm.unwrap();
+
+        // Both should have identical licensed candidates
+        // (LLM's invalid response is filtered, leaving only the valid one)
+        assert_eq!(
+            verify_lattice.licensed_candidates, verify_llm.licensed_candidates,
+            "Invalid LLM responses are filtered; licensed candidates identical"
+        );
+    }
+
+    #[test]
+    fn test_substrate_invariance_operator_licensing_decides_outcome() {
+        // Property 6: Licensing gate decides outcome uniformly across proposers
+        // LLM proposes valid candidate that's not licensed → filtered equally
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_unlicensed = Atom {
+            system: OntologySystem::SNOMED,
+            code: "999999".to_string(),
+            preferred_term: "WontBeLicensed".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        let input = Hyp::new(vec![atom_a.clone()]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        // Operator set for verification
+        let operators_verify1 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        // Proposer 1: Would propose unlicensed candidate (but gets blocked by gate)
+        struct UnlicensedProposer {
+            atom: Atom,
+        }
+        impl RefinementProposer for UnlicensedProposer {
+            fn propose(&self, _h: &Hyp, _e: &Evidence) -> CandidateSet {
+                let mut set = CandidateSet::new();
+                set.insert(Hyp::new(vec![self.atom.clone()]));
+                set
+            }
+        }
+
+        let unlicensed_proposer = UnlicensedProposer {
+            atom: atom_unlicensed.clone(),
+        };
+
+        // Proposer 2: LLM mock with same unlicensed candidate
+        let unlicensed_response = format!("SNOMED:{}@2026-01-31", atom_unlicensed.code);
+        let config = LlmProposerConfig::mock("test-model", vec![unlicensed_response], "0.1.0");
+        let llm_proposer = LlmProposer::new(config);
+
+        let operators_verify2 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let result_unlicensed =
+            propose_verify(&unlicensed_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
+
+        // Both should abstain (neither has licensed candidates)
+        assert!(result_unlicensed.is_err(), "Unlicensed candidate → abstain");
+        assert!(result_llm.is_err(), "LLM unlicensed candidate → abstain");
+
+        // Both abstain for the same reason: NoOperatorLicenses
+        match (result_unlicensed.unwrap_err(), result_llm.unwrap_err()) {
+            (
+                crate::abstain::AbstainReason::NoOperatorLicenses(_),
+                crate::abstain::AbstainReason::NoOperatorLicenses(_),
+            ) => {
+                // Expected: identical licensing behavior
+            }
+            other => panic!(
+                "Expected both to abstain with NoOperatorLicenses, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn test_substrate_invariance_audit_trails_both_populated() {
+        // Property 7: Both proposers populate audit trails identically
+        let atom_a = Atom {
+            system: OntologySystem::SNOMED,
+            code: "67822003".to_string(),
+            preferred_term: "Hypoxemia".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+        let atom_b = Atom {
+            system: OntologySystem::SNOMED,
+            code: "3723001".to_string(),
+            preferred_term: "ARDS".to_string(),
+            version: "2026-01-31".to_string(),
+        };
+
+        let input = Hyp::new(vec![atom_a.clone()]);
+        let evidence = Evidence::new(vec![], test_provenance());
+
+        let operators_for_proposer = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let lattice_proposer = LatticeSearchProposer::new(operators_for_proposer);
+
+        let response = format!(
+            "SNOMED:{}@2026-01-31, SNOMED:{}@2026-01-31",
+            atom_a.code, atom_b.code
+        );
+        let config = LlmProposerConfig::mock("test-model", vec![response], "0.1.0");
+        let llm_proposer = LlmProposer::new(config);
+
+        let operators_verify1 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let operators_verify2 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        let result_lattice =
+            propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
+
+        assert!(result_lattice.is_ok());
+        assert!(result_llm.is_ok());
+
+        let verify_lattice = result_lattice.unwrap();
+        let verify_llm = result_llm.unwrap();
+
+        // Both should have populated licensing_verdicts
+        assert!(
+            !verify_lattice.licensing_verdicts.is_empty(),
+            "LatticeSearch should populate licensing verdicts"
+        );
+        assert!(
+            !verify_llm.licensing_verdicts.is_empty(),
+            "LlmProposer should populate licensing verdicts"
+        );
+
+        // Both should have the same number of verdicts (same candidates licensed)
+        assert_eq!(
+            verify_lattice.licensing_verdicts.len(),
+            verify_llm.licensing_verdicts.len(),
+            "Audit trails should be same length"
+        );
+    }
 }
