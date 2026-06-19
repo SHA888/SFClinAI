@@ -180,7 +180,7 @@ The LatticeSearchProposer is trivially sound by construction: every candidate is
 | `test_llm_proposer_empty_response` (line 347) | Empty LLM response handled gracefully. | LLM returns `""` | Empty candidate set; licensing emits abstention. |
 | **Additional integration & edge cases** (3 tests) | Multiple mock responses, prompt construction, whitespace normalization. | Various response shapes and encodings | All handled correctly without crashing. |
 
-**Result:** ✓ 15 tests pass. LlmProposer demonstrates **robustness to adversarial input**: even when the LLM hallucinates freely, Stage 1 filters the garbage and Stage 2 licensing ensures only operator-derivable candidates are committed.
+**Result:** ✓ 15 tests pass. LlmProposer demonstrates **defense-in-depth robustness to adversarial input**: Stage 1 filters obvious garbage (Unstructured atoms, empty codes), and Stage 2 licensing ensures only operator-derivable candidates are committed. Note: fabricated-but-non-empty codes survive Stage 1 but are blocked by Stage 2 licensing—the load-bearing defense is the licensing gate, not the constraint filter.
 
 ---
 
@@ -282,6 +282,8 @@ Candidates returned by LLM:
 | Creatinine | ✗ Not its domain | ✓ Can produce from Cr | **YES** (by KdigoAki) |
 
 **Result:** Active hypothesis contains real candidates only. The invented code survives Stage 1 but is rejected by Stage 2 licensing. **OBL-PS-05 holds:** soundness is unaffected by LLM hallucinations. ✓
+
+**Assumption:** Stage 2 licensing rejects the invented code because the operators (SofaRespOperator, KdigoAkiOperator) produce only real SNOMED codes from the given evidence. This assumes operators validate their output atoms or only produce atoms they know are valid. The core OBL-PS-05 property (proposers cannot insert values into the active-hypothesis slot without going through operators) holds regardless; if an operator produces an invented atom, Stage 2 licensing would accept it—but that would indicate a bug in the operator, not in the substrate's proposer-operator separation.
 
 **Evidence:** Test case `test_llm_proposer_mixed_hallucinations_and_valid` (location: `clinlat/src/llm_proposer.rs:570–590`).
 
