@@ -153,14 +153,26 @@ impl LlmProposer {
     /// Parse an LLM response string into candidate hypotheses.
     ///
     /// # Expected format
-    /// Line-separated candidates; atoms within a candidate separated by commas.
+    /// Line-separated candidates; atoms within a candidate separated by commas or semicolons.
     /// - `"SNOMED:12345, SNOMED:67890"` → single candidate with two atoms
     /// - `"SNOMED:12345\nSNOMED:67890"` → two separate single-atom candidates
-    /// - `"SNOMED:12345@2026-01-31"` → with explicit version
+    /// - `"SNOMED:12345@2026-01-31"` → with explicit version (@ separator)
+    /// - `"SNOMED:12345|2026-01-31"` → pipe-versioned format (preserved for parse_atom)
     ///
-    /// Multi-atom hypotheses are supported: atoms separated by commas form one hypothesis.
+    /// Multi-atom hypotheses are supported: atoms separated by commas or semicolons form one hypothesis.
     /// Parsing failures (malformed atoms, unrecognized systems) are recorded as hallucinations
     /// and excluded from the candidate set (silent filtering per INV-PS-06).
+    ///
+    /// # Pipe character
+    /// Pipe (|) is reserved for version separation in parse_atom (e.g., "SNOMED:12345|2026-01-31")
+    /// and is NOT used as an atom separator here. Only commas and semicolons separate atoms.
+    ///
+    /// # Partial parsing semantics
+    /// When a candidate line contains multiple atoms, partial parsing is applied per INV-PS-06:
+    /// - Valid atoms are collected into a single Hyp; malformed atoms are silently dropped.
+    /// - If some atoms parse, a candidate is added (partial refinement is still valid).
+    /// - If all atoms fail to parse, the entire candidate is dropped (complete hallucination).
+    /// - This ensures the substrate is sound: invalid proposer output cannot bypass gates.
     ///
     /// # Note
     /// This format is shared with parse_atom(). If other proposers need similar parsing,
@@ -175,7 +187,7 @@ impl LlmProposer {
             .filter(|s| !s.is_empty())
             .collect();
 
-        // If no newlines, treat entire response as single candidate (atoms separated by commas)
+        // If no newlines, treat entire response as single candidate (atoms separated by commas/semicolons)
         let candidates_to_parse = if lines.is_empty() {
             vec![response]
         } else {
@@ -183,9 +195,9 @@ impl LlmProposer {
         };
 
         for candidate_str in candidates_to_parse {
-            // Split atoms by comma, pipe, or semicolon
+            // Split atoms by comma or semicolon only (pipe reserved for version syntax in parse_atom)
             let atom_strs: Vec<&str> = candidate_str
-                .split(|c| [',', ';', '|'].contains(&c))
+                .split(|c| [',', ';'].contains(&c))
                 .map(|s| s.trim())
                 .filter(|s| !s.is_empty())
                 .collect();
@@ -193,21 +205,24 @@ impl LlmProposer {
             let mut atoms = Vec::new();
 
             for atom_str in atom_strs {
-                // Parse each atom; silently discard failures (hallucinations)
+                // Parse each atom; silently discard failures (hallucinations per INV-PS-06)
                 match self.parse_atom(atom_str) {
                     Ok(atom) => atoms.push(atom),
                     Err(_) => {
-                        // Hallucination detected; skip this atom
+                        // Invalid atom format (malformed system:code, unknown system, or empty code)
+                        // Excluded from candidate set per INV-PS-06 (substrate soundness gate)
                     }
                 }
             }
 
-            // Only add candidate if at least one atom was successfully parsed
+            // Only add candidate if at least one atom was successfully parsed.
+            // Rationale: a partial candidate (subset of intended atoms) is still a valid refinement hypothesis
+            // that can be licensed by an operator, and the substrate's soundness gate (licensing verification)
+            // ensures any accepted candidate is correct. If no atoms parse, the entire candidate is dropped
+            // as a complete hallucination.
             if !atoms.is_empty() {
                 valid_candidates.push(Hyp::new(atoms));
             }
-            // If candidate had errors but some atoms parsed, that's still valid (partial parsing)
-            // If candidate had all atoms fail, it's a complete hallucination and dropped
         }
 
         ParseResult { valid_candidates }
