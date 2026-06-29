@@ -33,9 +33,9 @@ struct ParseResult {
 }
 
 /// Atom-level separator characters used in LLM response format.
-/// Used by both parse_response (production) and test strategies (proptest) to ensure
-/// consistent format parsing across the codebase. If separator set changes, both
-/// production parser and test generators must be updated together.
+/// Used by parse_response (production parser) to split atoms within candidate lines.
+/// Test strategies (proptest) should reference this constant to remain in sync with the parser.
+/// If separator set changes, both production parser and test generators must be updated together.
 ///
 /// Format: Atoms within a candidate line are separated by commas or semicolons.
 /// Pipe (|) is reserved for version separation *within* an atom (SYSTEM:CODE|VERSION),
@@ -166,8 +166,7 @@ impl LlmProposer {
     /// Line-separated candidates; atoms within a candidate separated by commas or semicolons.
     /// - `"SNOMED:12345, SNOMED:67890"` → single candidate with two atoms
     /// - `"SNOMED:12345\nSNOMED:67890"` → two separate single-atom candidates
-    /// - `"SNOMED:12345@2026-01-31"` → with explicit version (@ separator)
-    /// - `"SNOMED:12345|2026-01-31"` → pipe-versioned format (preserved for parse_atom)
+    /// - `"SNOMED:12345@2026-01-31"` → with explicit version (@ separator; preferred)
     ///
     /// Multi-atom hypotheses are supported: atoms separated by commas or semicolons form one hypothesis.
     /// Parsing failures (malformed atoms, unrecognized systems) are recorded as hallucinations
@@ -733,7 +732,7 @@ mod tests {
                 .prop_map(|(valid, invalid)| {
                     let mut all = valid;
                     all.extend(invalid);
-                    all.join(",")
+                    all.join(&ATOM_SEPARATORS[0].to_string())
                 })
         }
 

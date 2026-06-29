@@ -1763,8 +1763,7 @@ mod tests {
         }
     }
 
-    /// Synthetic fixture atom: ARDS (Acute Respiratory Distress Syndrome).
-    /// SNOMED code 67782005 is the correct code for ARDS (NOT 3723001, which is Arthritis).
+    /// Synthetic fixture atom for ARDS (code 67782005).
     /// Used across substrate-invariance property tests to provide consistent test data.
     /// CAUTION: Do not treat these fixtures as clinically accurate — they are chosen for structural
     /// uniqueness in tests, not for real-world diagnostic use. When integrating with a real SNOMED
@@ -1973,8 +1972,20 @@ mod tests {
             let config = LlmProposerConfig::mock("test-model", vec![expected_response], "0.1.0");
             let llm_proposer = LlmProposer::new(config);
 
-            // Build shared operator set for licensing verification
-            let operators_verify = OperatorSet::new().register(
+            // Build operator set for licensing verification (LatticeSearchProposer).
+            // Independently constructed to verify OperatorSet construction is deterministic (see Property 1 comment).
+            let operators_verify1 = OperatorSet::new().register(
+                Box::new(RefiningOperatorFixture {
+                    atom_to_add: atom.clone(),
+                }),
+                OperatorMetadata {
+                    name: op_name.clone(),
+                    version: "test".to_string(),
+                },
+            );
+
+            // Build a second independently-constructed operator set for licensing verification (LlmProposer).
+            let operators_verify2 = OperatorSet::new().register(
                 Box::new(RefiningOperatorFixture {
                     atom_to_add: atom.clone(),
                 }),
@@ -1985,8 +1996,8 @@ mod tests {
             );
 
             let result_lattice =
-                propose_verify(&lattice_proposer, &operators_verify, &input, &evidence);
-            let result_llm = propose_verify(&llm_proposer, &operators_verify, &input, &evidence);
+                propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+            let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
 
             assert!(
                 result_lattice.is_ok(),

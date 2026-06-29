@@ -362,6 +362,15 @@ impl SNOMEDAdapter {
             },
         );
         snapshot.insert(
+            "67782005".to_string(),
+            Atom {
+                system: OntologySystem::SNOMED,
+                code: "67782005".to_string(),
+                preferred_term: "ARDS".to_string(),
+                version: "2026-01-31".to_string(),
+            },
+        );
+        snapshot.insert(
             "29303001".to_string(),
             Atom {
                 system: OntologySystem::SNOMED,
