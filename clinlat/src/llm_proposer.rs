@@ -32,6 +32,16 @@ struct ParseResult {
     pub valid_candidates: Vec<Hyp>,
 }
 
+/// Atom-level separator characters used in LLM response format.
+/// Used by both parse_response (production) and test strategies (proptest) to ensure
+/// consistent format parsing across the codebase. If separator set changes, both
+/// production parser and test generators must be updated together.
+///
+/// Format: Atoms within a candidate line are separated by commas or semicolons.
+/// Pipe (|) is reserved for version separation *within* an atom (SYSTEM:CODE|VERSION),
+/// not as an atom-level separator.
+const ATOM_SEPARATORS: &[char] = &[',', ';'];
+
 /// LLM-based refinement proposer.
 ///
 /// Implements `RefinementProposer` by:
@@ -195,9 +205,10 @@ impl LlmProposer {
         };
 
         for candidate_str in candidates_to_parse {
-            // Split atoms by comma or semicolon only (pipe reserved for version syntax in parse_atom)
+            // Split atoms by ATOM_SEPARATORS (comma or semicolon; pipe is reserved for version syntax in parse_atom).
+            // CRITICAL: Any change to separators must be synchronized with ATOM_SEPARATORS constant and test strategies.
             let atom_strs: Vec<&str> = candidate_str
-                .split(|c| [',', ';'].contains(&c))
+                .split(|c| ATOM_SEPARATORS.contains(&c))
                 .map(|s| s.trim())
                 .filter(|s| !s.is_empty())
                 .collect();
@@ -231,10 +242,21 @@ impl LlmProposer {
     /// Parse a single atom string (e.g., "SNOMED:12345" or "SNOMED:12345@2026-01-31").
     fn parse_atom(&self, atom_str: &str) -> Result<Atom, String> {
         // Format: SYSTEM:CODE[@VERSION] or SYSTEM:CODE|VERSION
-        // Examples:
-        //   - "SNOMED:12345"
-        //   - "SNOMED:12345@2026-01-31"
-        //   - "SNOMED:12345|2026-01-31"
+        // Primary format: @ (preferred for LLM responses)
+        // Pipe format: | (supported for backward compat; not used by parse_response)
+        //
+        // CRITICAL: Pipe is a version separator, NOT an atom delimiter.
+        // Examples of correct usage:
+        //   - "SNOMED:12345" (no version)
+        //   - "SNOMED:12345@2026-01-31" (@ version separator; preferred)
+        //   - "SNOMED:12345|2026-01-31" (| version separator; direct callers only, not from parse_response)
+        //
+        // WARNING: If atom_str contains both a pipe AND is meant to represent multiple ontology codes
+        // (e.g., hypothetically "SNOMED:12345|RxNorm:9999"), the pipe branch will treat the right side
+        // as a version string without validation. This is intentional: parse_response splits atoms by
+        // commas/semicolons (not pipes), so any atom reaching this function is guaranteed to be a
+        // single SYSTEM:CODE token. Multi-atom inputs should be comma or semicolon separated in
+        // parse_response before reaching parse_atom.
 
         let (system_code, version) = if atom_str.contains('@') {
             let parts: Vec<&str> = atom_str.split('@').collect();
@@ -423,11 +445,16 @@ mod tests {
     }
 
     #[test]
-    fn test_llm_proposer_parses_pipe_separated_atoms() {
-        // Mock response with pipe-separated atoms (alternative delimiter)
+    fn test_llm_proposer_parses_atom_with_pipe_version_separator() {
+        // Pipe is used as a version separator within a single atom (e.g., "SNOMED:12345|2026-01-31"),
+        // NOT as an atom-level delimiter. This test verifies that parse_atom correctly parses
+        // the pipe-version format: system:code|version where version is a date or SemVer string.
+        // Note: LLM responses should prefer @-versioning per prompt template; pipe is supported
+        // for direct parse_atom callers but not actively used in parse_response path (pipe removed
+        // from atom-separator split to avoid ambiguity with version separator).
         let config = LlmProposerConfig::mock(
             "mock-model",
-            vec!["SNOMED:12345|RxNorm:9999".to_string()],
+            vec!["SNOMED:12345|2026-01-31".to_string()],
             "0.1.0",
         );
         let proposer = LlmProposer::new(config);
@@ -436,10 +463,25 @@ mod tests {
         let e = Evidence::new(vec![], test_provenance());
 
         let candidates = proposer.propose(&h, &e);
+        assert_eq!(candidates.len(), 1, "Should parse one candidate");
+
+        // Extract the single candidate to verify its structure
+        let candidate = candidates.iter().next().expect("Should have one candidate");
         assert_eq!(
-            candidates.len(),
+            candidate.atoms().len(),
             1,
-            "Should parse pipe-separated atoms as single candidate"
+            "Should have one atom in candidate"
+        );
+
+        let atom = candidate
+            .atoms()
+            .iter()
+            .next()
+            .expect("Should have one atom");
+        assert_eq!(atom.code, "12345", "Should parse SNOMED code correctly");
+        assert_eq!(
+            atom.version, "2026-01-31",
+            "Pipe-versioned format should parse version correctly"
         );
     }
 

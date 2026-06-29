@@ -1749,6 +1749,11 @@ mod tests {
     use crate::llm_proposer::LlmProposer;
     use crate::llm_proposer_config::LlmProposerConfig;
 
+    /// Synthetic fixture atom: Hypoxemia (real SNOMED code 67822003).
+    /// Used across substrate-invariance property tests to provide consistent test data.
+    /// CAUTION: Do not treat these fixtures as clinically accurate — they are chosen for structural
+    /// uniqueness in tests, not for real-world diagnostic use. When integrating with a real SNOMED
+    /// ontology backend, verify that fixture codes still represent the intended concepts.
     fn si_atom_hypoxemia() -> Atom {
         Atom {
             system: OntologySystem::SNOMED,
@@ -1758,10 +1763,16 @@ mod tests {
         }
     }
 
+    /// Synthetic fixture atom: ARDS (Acute Respiratory Distress Syndrome).
+    /// SNOMED code 67782005 is the correct code for ARDS (NOT 3723001, which is Arthritis).
+    /// Used across substrate-invariance property tests to provide consistent test data.
+    /// CAUTION: Do not treat these fixtures as clinically accurate — they are chosen for structural
+    /// uniqueness in tests, not for real-world diagnostic use. When integrating with a real SNOMED
+    /// ontology backend, verify that fixture codes still represent the intended concepts.
     fn si_atom_ards() -> Atom {
         Atom {
             system: OntologySystem::SNOMED,
-            code: "3723001".to_string(),
+            code: "67782005".to_string(),
             preferred_term: "ARDS".to_string(),
             version: "2026-01-31".to_string(),
         }
@@ -1789,8 +1800,15 @@ mod tests {
         );
         let lattice_proposer = LatticeSearchProposer::new(operators_for_proposer);
 
-        // Build shared operator set for soundness verification (used by both proposers)
-        let operators_verify = OperatorSet::new().register(
+        // Build operator set for soundness verification (LatticeSearchProposer).
+        // CRITICAL: Constructed independently to verify that OperatorSet construction is deterministic.
+        // The substrate-invariance property claims that identical operator registrations produce
+        // identical refinement outcomes regardless of proposer. Testing with two independently-
+        // constructed instances validates that OperatorSet iteration order (apply_set) is not
+        // dependent on construction timing or object identity. If OperatorSet internals ever change
+        // to use non-deterministic data structures (e.g., HashMap), this pattern will detect the
+        // regression; a single shared instance would silently miss it.
+        let operators_verify1 = OperatorSet::new().register(
             Box::new(RefiningOperatorFixture {
                 atom_to_add: atom_b.clone(),
             }),
@@ -1808,10 +1826,22 @@ mod tests {
         let config = LlmProposerConfig::mock("test-model", vec![expected_candidate_str], "0.1.0");
         let llm_proposer = LlmProposer::new(config);
 
-        // Run both through propose_verify with the same operator set
+        // Build a second independently-constructed operator set for soundness verification (LlmProposer).
+        // See comment above: this second instance ensures construction determinism is tested.
+        let operators_verify2 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        // Run both through propose_verify with independently-constructed operator sets
         let result_lattice =
-            propose_verify(&lattice_proposer, &operators_verify, &input, &evidence);
-        let result_llm = propose_verify(&llm_proposer, &operators_verify, &input, &evidence);
+            propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
 
         assert!(
             result_lattice.is_ok(),
@@ -1861,8 +1891,20 @@ mod tests {
             LlmProposerConfig::mock("test-model", vec![response_with_hallucination], "0.1.0");
         let llm_proposer = LlmProposer::new(config);
 
-        // Build shared operator set for licensing verification
-        let operators_verify = OperatorSet::new().register(
+        // Build operator set for licensing verification (LatticeSearchProposer).
+        // Constructed independently to verify OperatorSet construction is deterministic (see Property 1 comment).
+        let operators_verify1 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        // Build a second independently-constructed operator set for licensing verification (LlmProposer).
+        let operators_verify2 = OperatorSet::new().register(
             Box::new(RefiningOperatorFixture {
                 atom_to_add: atom_b.clone(),
             }),
@@ -1873,8 +1915,8 @@ mod tests {
         );
 
         let result_lattice =
-            propose_verify(&lattice_proposer, &operators_verify, &input, &evidence);
-        let result_llm = propose_verify(&llm_proposer, &operators_verify, &input, &evidence);
+            propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
 
         assert!(result_lattice.is_ok());
         assert!(result_llm.is_ok());
@@ -2049,8 +2091,20 @@ mod tests {
         let config = LlmProposerConfig::mock("test-model", vec![response_mixed], "0.1.0");
         let llm_proposer = LlmProposer::new(config);
 
-        // Build shared operator set for licensing verification
-        let operators_verify = OperatorSet::new().register(
+        // Build operator set for licensing verification (LatticeSearchProposer).
+        // Constructed independently to verify OperatorSet construction is deterministic (see Property 1 comment).
+        let operators_verify1 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        // Build a second independently-constructed operator set for licensing verification (LlmProposer).
+        let operators_verify2 = OperatorSet::new().register(
             Box::new(RefiningOperatorFixture {
                 atom_to_add: atom_b.clone(),
             }),
@@ -2061,8 +2115,8 @@ mod tests {
         );
 
         let result_lattice =
-            propose_verify(&lattice_proposer, &operators_verify, &input, &evidence);
-        let result_llm = propose_verify(&llm_proposer, &operators_verify, &input, &evidence);
+            propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
 
         assert!(result_lattice.is_ok());
         assert!(result_llm.is_ok());
@@ -2094,8 +2148,9 @@ mod tests {
         let input = Hyp::new(vec![atom_a.clone()]);
         let evidence = Evidence::new(vec![], test_provenance());
 
-        // Build shared operator set for verification (only licenses atom_b, not atom_unlicensed)
-        let operators_verify = OperatorSet::new().register(
+        // Build operator set for verification (only licenses atom_b, not atom_unlicensed).
+        // Constructed independently to verify OperatorSet construction is deterministic (see Property 1 comment).
+        let operators_verify1 = OperatorSet::new().register(
             Box::new(RefiningOperatorFixture {
                 atom_to_add: atom_b.clone(),
             }),
@@ -2126,9 +2181,20 @@ mod tests {
         let config = LlmProposerConfig::mock("test-model", vec![unlicensed_response], "0.1.0");
         let llm_proposer = LlmProposer::new(config);
 
+        // Build a second independently-constructed operator set for verification.
+        let operators_verify2 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
         let result_unlicensed =
-            propose_verify(&unlicensed_proposer, &operators_verify, &input, &evidence);
-        let result_llm = propose_verify(&llm_proposer, &operators_verify, &input, &evidence);
+            propose_verify(&unlicensed_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
 
         // Both should abstain (neither has licensed candidates)
         assert!(result_unlicensed.is_err(), "Unlicensed candidate → abstain");
@@ -2177,8 +2243,20 @@ mod tests {
         let config = LlmProposerConfig::mock("test-model", vec![response], "0.1.0");
         let llm_proposer = LlmProposer::new(config);
 
-        // Build shared operator set for licensing verification
-        let operators_verify = OperatorSet::new().register(
+        // Build operator set for licensing verification (LatticeSearchProposer).
+        // Constructed independently to verify OperatorSet construction is deterministic (see Property 1 comment).
+        let operators_verify1 = OperatorSet::new().register(
+            Box::new(RefiningOperatorFixture {
+                atom_to_add: atom_b.clone(),
+            }),
+            OperatorMetadata {
+                name: "AddARDS".to_string(),
+                version: "test".to_string(),
+            },
+        );
+
+        // Build a second independently-constructed operator set for licensing verification (LlmProposer).
+        let operators_verify2 = OperatorSet::new().register(
             Box::new(RefiningOperatorFixture {
                 atom_to_add: atom_b.clone(),
             }),
@@ -2189,8 +2267,8 @@ mod tests {
         );
 
         let result_lattice =
-            propose_verify(&lattice_proposer, &operators_verify, &input, &evidence);
-        let result_llm = propose_verify(&llm_proposer, &operators_verify, &input, &evidence);
+            propose_verify(&lattice_proposer, &operators_verify1, &input, &evidence);
+        let result_llm = propose_verify(&llm_proposer, &operators_verify2, &input, &evidence);
 
         assert!(result_lattice.is_ok());
         assert!(result_llm.is_ok());

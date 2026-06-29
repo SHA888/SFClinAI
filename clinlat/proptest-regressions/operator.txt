@@ -6,3 +6,4 @@
 # everyone who runs the test benefits from these saved cases.
 cc a635aadbf1868a7bcc1f423f2fe47365a67d05f3b05927a40eee4489261f1cce # shrinks to obs_codes = ["A:0"]
 cc e79272a35a4ed0d32ec70e8112065f57e6c38d9102a1dafb2125395f1e142d2c # shrinks to h = Hyp([Atom { system: SNOMED, code: "0000", preferred_term: "Aaaa", version: "0.0.0" }, Atom { system: SNOMED, code: "0000", preferred_term: "Aaaa", version: "0.0.1" }])
+cc 5bd991ac8d8f973541af3f2b7055178c0fc4851403bad85e8c16ddf7fbb95a42 # shrinks to codes = ["ICD11:498", "ICD11:498"]
