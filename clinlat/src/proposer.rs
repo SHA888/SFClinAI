@@ -730,12 +730,7 @@ mod tests {
             preferred_term: "Hypoxemia".to_string(),
             version: "2026-01-31".to_string(),
         };
-        let atom_b = Atom {
-            system: OntologySystem::SNOMED,
-            code: "3723001".to_string(),
-            preferred_term: "ARDS".to_string(),
-            version: "2026-01-31".to_string(),
-        };
+        let atom_b = si_atom_ards();
         // Input has only atom_a
         let input = Hyp::new(vec![atom_a.clone()]);
         // Candidate has both atoms: {a, b} ⊃ {a}, so it refines input (operator-reachable)
@@ -958,12 +953,7 @@ mod tests {
             preferred_term: "Hypoxemia".to_string(),
             version: "2026-01-31".to_string(),
         };
-        let atom_b = Atom {
-            system: OntologySystem::SNOMED,
-            code: "3723001".to_string(),
-            preferred_term: "ARDS".to_string(),
-            version: "2026-01-31".to_string(),
-        };
+        let atom_b = si_atom_ards();
         // Input has both atoms
         let input = Hyp::new(vec![atom_a.clone(), atom_b.clone()]);
         // Candidate only has atom_a → does NOT refine input (missing atom_b)
@@ -1014,12 +1004,7 @@ mod tests {
             preferred_term: "Hypoxemia".to_string(),
             version: "2026-01-31".to_string(),
         };
-        let atom_b = Atom {
-            system: OntologySystem::SNOMED,
-            code: "3723001".to_string(),
-            preferred_term: "ARDS".to_string(),
-            version: "2026-01-31".to_string(),
-        };
+        let atom_b = si_atom_ards();
 
         // Proposer returns {A}
         let candidate = Hyp::new(vec![atom_a.clone()]);
@@ -1061,12 +1046,7 @@ mod tests {
             preferred_term: "Hypoxemia".to_string(),
             version: "2026-01-31".to_string(),
         };
-        let atom_b = Atom {
-            system: OntologySystem::SNOMED,
-            code: "3723001".to_string(),
-            preferred_term: "ARDS".to_string(),
-            version: "2026-01-31".to_string(),
-        };
+        let atom_b = si_atom_ards();
 
         // Proposer returns {A}
         let candidate = Hyp::new(vec![atom_a.clone()]);
@@ -1111,12 +1091,7 @@ mod tests {
             preferred_term: "Hypoxemia".to_string(),
             version: "2026-01-31".to_string(),
         };
-        let atom_b = Atom {
-            system: OntologySystem::SNOMED,
-            code: "3723001".to_string(),
-            preferred_term: "ARDS".to_string(),
-            version: "2026-01-31".to_string(),
-        };
+        let atom_b = si_atom_ards();
 
         // Proposer returns {A} and {B}
         let candidate_a = Hyp::new(vec![atom_a.clone()]);
@@ -1172,12 +1147,7 @@ mod tests {
             preferred_term: "Hypoxemia".to_string(),
             version: "2026-01-31".to_string(),
         };
-        let atom_b = Atom {
-            system: OntologySystem::SNOMED,
-            code: "3723001".to_string(),
-            preferred_term: "ARDS".to_string(),
-            version: "2026-01-31".to_string(),
-        };
+        let atom_b = si_atom_ards();
         let atom_c = Atom {
             system: OntologySystem::SNOMED,
             code: "2081003".to_string(),
@@ -1309,12 +1279,7 @@ mod tests {
             preferred_term: "Hypoxemia".to_string(),
             version: "2026-01-31".to_string(),
         };
-        let atom_b = Atom {
-            system: OntologySystem::SNOMED,
-            code: "3723001".to_string(),
-            preferred_term: "ARDS".to_string(),
-            version: "2026-01-31".to_string(),
-        };
+        let atom_b = si_atom_ards();
 
         // Proposer returns {A} and {B}
         let candidate_a = Hyp::new(vec![atom_a.clone()]);
