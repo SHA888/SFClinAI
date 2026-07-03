@@ -28,17 +28,18 @@
 
 use chrono::Utc;
 use clinlat::{
-    Evidence, Hyp, LatticeSearchProposer, LlmProposer, LlmProposerConfig, Observation, Operator,
-    OperatorMetadata, OperatorSet, Outcome, Provenance, ProvenanceOrigin, RefinementProposer,
-    SofaRespOperator, Ver, propose_verify,
+    Atom, Evidence, Hyp, LatticeSearchProposer, LlmProposer, LlmProposerConfig, Observation,
+    Operator, OperatorMetadata, OperatorSet, Outcome, Provenance, ProvenanceOrigin,
+    RefinementProposer, SofaRespOperator, Ver, propose_verify,
 };
 use std::collections::BTreeMap;
 
-/// Builds the shared sepsis-3 evidence: PaO₂/FiO₂ = 250 (SOFA respiratory score 2),
-/// tagged with the provenance version the SofaRespOperator (v0.2.0) expects.
-fn build_evidence() -> Evidence {
+/// Builds sepsis-3 evidence for a given PaO₂ (mmHg), holding FiO₂ = 0.60 and
+/// mechanical ventilation fixed, tagged with the provenance version the
+/// SofaRespOperator (v0.2.0) expects.
+fn build_evidence_with_pao2(pao2: f64) -> Evidence {
     let observations = vec![
-        Observation::new("LOINC:2703-7", serde_json::json!(150.0))
+        Observation::new("LOINC:2703-7", serde_json::json!(pao2))
             .with_unit("mmHg")
             .with_source("Radiology PACS – ABG from 14:30"),
         Observation::new("LOINC:3150-0", serde_json::json!(0.60))
@@ -56,6 +57,37 @@ fn build_evidence() -> Evidence {
     );
 
     Evidence::new(observations, provenance)
+}
+
+/// Registers the single SOFA-respiratory operator used throughout this example.
+/// Called once per call site so each `LatticeSearchProposer`/`propose_verify`
+/// invocation gets its own independently-constructed `OperatorSet`, per this
+/// repo's test-independence discipline (CLAUDE.md, "Structuring tests for
+/// safety verification").
+fn build_operator_set() -> OperatorSet {
+    OperatorSet::new().register(
+        Box::new(SofaRespOperator::default_v0_2()),
+        OperatorMetadata {
+            name: "sofa_resp".to_string(),
+            version: "clinlat-v0.2.0".to_string(),
+        },
+    )
+}
+
+/// Formats an atom for human-readable printing. `SofaRespOperator` embeds its
+/// ontology system as a literal prefix inside `Atom.code` (a pre-existing,
+/// out-of-scope encoding quirk — see CLAUDE.md), so printing `system:code`
+/// verbatim would double it (e.g. "SNOMED:SNOMED:..."). This only affects
+/// display; the raw mock-LLM response text built below must NOT use this
+/// helper — parse_atom's first-colon split relies on the doubled prefix to
+/// reconstruct the atom's `code` field correctly.
+fn display_atom(a: &Atom) -> String {
+    let sys_prefix = format!("{}:", a.system);
+    if a.code.starts_with(&sys_prefix) {
+        format!("{}@{}", a.code, a.version)
+    } else {
+        format!("{}:{}@{}", a.system, a.code, a.version)
+    }
 }
 
 fn main() {
@@ -76,7 +108,7 @@ fn main() {
     println!("STEP 1: Construct Evidence (identical for both proposers)");
     println!("────────────────────────────────────────────────────────\n");
 
-    let evidence = build_evidence();
+    let evidence = build_evidence_with_pao2(150.0);
 
     println!("  • PaO₂ = 150 mmHg, FiO₂ = 0.60 → ratio = 250 (SOFA respiratory input)");
     println!("  • On mechanical ventilation: YES\n");
@@ -105,10 +137,8 @@ fn main() {
     };
 
     println!(
-        "  SofaRespOperator licenses: {}:{}@{} ({})\n",
-        ground_truth_atom.system,
-        ground_truth_atom.code,
-        ground_truth_atom.version,
+        "  SofaRespOperator licenses: {} ({})\n",
+        display_atom(&ground_truth_atom),
         ground_truth_atom.preferred_term
     );
 
@@ -120,14 +150,7 @@ fn main() {
     println!("STEP 3: LatticeSearchProposer (Task 9.1) — Raw Candidates");
     println!("───────────────────────────────────────────────────────\n");
 
-    let ops_for_lattice_search = OperatorSet::new().register(
-        Box::new(SofaRespOperator::default_v0_2()),
-        OperatorMetadata {
-            name: "sofa_resp".to_string(),
-            version: "clinlat-v0.2.0".to_string(),
-        },
-    );
-    let lattice_proposer = LatticeSearchProposer::new(ops_for_lattice_search);
+    let lattice_proposer = LatticeSearchProposer::new(build_operator_set());
 
     let lattice_raw_candidates = lattice_proposer.propose(&Hyp::unknown(), &evidence);
 
@@ -138,10 +161,7 @@ fn main() {
     for c in &lattice_raw_candidates {
         println!(
             "    • {:?}",
-            c.atoms()
-                .iter()
-                .map(|a| format!("{}:{}@{}", a.system, a.code, a.version))
-                .collect::<Vec<_>>()
+            c.atoms().iter().map(display_atom).collect::<Vec<_>>()
         );
     }
     println!();
@@ -161,14 +181,39 @@ fn main() {
     println!("STEP 4: LlmProposer (Task 10.2, mock) — Divergent Raw Candidates");
     println!("──────────────────────────────────────────────────────────────\n");
 
+    // The "correct" and "hallucinated" mock LLM lines are both built with the
+    // doubled system-prefix format (not `display_atom`), because parse_atom's
+    // first-colon split depends on it to reconstruct `Atom.code` correctly —
+    // see `display_atom`'s doc comment above.
     let correct_line = format!(
         "{}:{}@{}",
         ground_truth_atom.system, ground_truth_atom.code, ground_truth_atom.version
     );
-    // Same code family as the ground-truth atom, but the trailing digit is
-    // altered to name a different (wrong) SOFA severity score — syntactically
-    // valid, ontology-bounded, but not what this evidence actually licenses.
-    let wrong_severity_line = correct_line.replace("resp-2", "resp-4");
+    // Wrong-severity hallucination: derived from a genuinely different
+    // evidence (PaO₂ = 50 mmHg → ratio ≈ 83 → SOFA score 4, still on mech
+    // vent) and computed via the same operator, rather than string-patching
+    // the correct atom's code — so this stays a real, distinct SOFA severity
+    // regardless of how SofaRespOperator's thresholds or atom encoding evolve.
+    let wrong_evidence = build_evidence_with_pao2(50.0);
+    let wrong_atom = match ground_truth_op.apply(&Hyp::unknown(), &wrong_evidence) {
+        Outcome::Refined(refined) => refined
+            .atoms()
+            .first()
+            .cloned()
+            .expect("SofaRespOperator must produce exactly one atom for this evidence"),
+        other => panic!(
+            "expected Outcome::Refined for this evidence, got {:?}",
+            other
+        ),
+    };
+    assert_ne!(
+        wrong_atom.code, ground_truth_atom.code,
+        "wrong-severity fixture must differ from the ground-truth atom — check evidence values"
+    );
+    let wrong_severity_line = format!(
+        "{}:{}@{}",
+        wrong_atom.system, wrong_atom.code, wrong_atom.version
+    );
 
     let response_text = format!(
         "{}\n{}\nNOT_AN_ATOM_AT_ALL\nFHIR:99999@0.2.0",
@@ -203,14 +248,15 @@ fn main() {
     for c in &llm_raw_candidates {
         println!(
             "    • {:?}",
-            c.atoms()
-                .iter()
-                .map(|a| format!("{}:{}@{}", a.system, a.code, a.version))
-                .collect::<Vec<_>>()
+            c.atoms().iter().map(display_atom).collect::<Vec<_>>()
         );
     }
     println!();
 
+    assert_ne!(
+        lattice_raw_candidates, llm_raw_candidates,
+        "raw candidate sets must diverge in content for this example to demonstrate anything"
+    );
     println!(
         "  ⚠ Raw candidate sets already DIVERGE: LatticeSearchProposer produced {}, LlmProposer produced {}.\n",
         lattice_raw_candidates.len(),
@@ -228,20 +274,8 @@ fn main() {
     println!("STEP 5: Soundness-Verification Gate (propose_verify, INV-PS-06)");
     println!("─────────────────────────────────────────────────────────────\n");
 
-    let ops_for_lattice_verify = OperatorSet::new().register(
-        Box::new(SofaRespOperator::default_v0_2()),
-        OperatorMetadata {
-            name: "sofa_resp".to_string(),
-            version: "clinlat-v0.2.0".to_string(),
-        },
-    );
-    let ops_for_llm_verify = OperatorSet::new().register(
-        Box::new(SofaRespOperator::default_v0_2()),
-        OperatorMetadata {
-            name: "sofa_resp".to_string(),
-            version: "clinlat-v0.2.0".to_string(),
-        },
-    );
+    let ops_for_lattice_verify = build_operator_set();
+    let ops_for_llm_verify = build_operator_set();
 
     let lattice_verify = propose_verify(
         &lattice_proposer,
@@ -302,10 +336,7 @@ fn main() {
     for c in &lattice_verify.licensed_candidates {
         println!(
             "    {:?}",
-            c.atoms()
-                .iter()
-                .map(|a| format!("{}:{}@{}", a.system, a.code, a.version))
-                .collect::<Vec<_>>()
+            c.atoms().iter().map(display_atom).collect::<Vec<_>>()
         );
     }
     println!();

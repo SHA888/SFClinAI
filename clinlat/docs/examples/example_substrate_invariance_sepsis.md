@@ -67,11 +67,13 @@ This keeps the example correct even if `SofaRespOperator`'s internal atom encodi
 | Line | Content | Outcome |
 |------|---------|---------|
 | 1 | `correct_line` (matches ground truth) | ✓ Parses, later licensed |
-| 2 | `correct_line` with the trailing digit changed (`resp-2` → `resp-4`) | ✓ Parses (ontology-valid), **not** licensed — wrong severity |
+| 2 | Wrong-severity atom, computed by applying `SofaRespOperator` to genuinely different evidence (PaO₂ = 50 mmHg → ratio ≈ 83 → SOFA score 4) | ✓ Parses (ontology-valid), **not** licensed — wrong severity |
 | 3 | `NOT_AN_ATOM_AT_ALL` | ✗ Fails `parse_atom` (no `:`) — dropped silently at **parse** stage |
 | 4 | `FHIR:99999@0.2.0` | ✗ Unknown ontology system — dropped silently at **parse** stage |
 
-**Result**: `LatticeSearchProposer` produces **1** raw candidate; `LlmProposer` produces **2** raw candidates (lines 3–4 never survive parsing, so they never even reach the candidate set). The raw candidate sets already disagree in size and content — this is the "divergent candidate sets" half of the DoD.
+Line 2 is derived by running the operator on a second, deliberately different evidence fixture rather than by string-patching the correct atom's code — this keeps the hallucination a genuinely distinct, operator-computed severity regardless of how `SofaRespOperator`'s thresholds or internal atom encoding evolve. An `assert_ne!` on the two atoms' codes guards this fixture directly.
+
+**Result**: `LatticeSearchProposer` produces **1** raw candidate; `LlmProposer` produces **2** raw candidates (lines 3–4 never survive parsing, so they never even reach the candidate set). An `assert_ne!` on the two raw candidate sets enforces that they diverge in content, not just count — this is the "divergent candidate sets" half of the DoD, checked at runtime rather than only narrated.
 
 ### Step 4: Both pass through the identical soundness gate
 
