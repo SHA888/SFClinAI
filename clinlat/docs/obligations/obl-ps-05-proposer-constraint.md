@@ -311,6 +311,20 @@ vec![
 
 ---
 
+### Example 4: Substrate-First Claim, Proposer Swap on Sepsis-3 (11.3)
+
+**Setup:** Single operator (`SofaRespOperator`), identical evidence given to two independently-constructed proposers: `LatticeSearchProposer` (task 9.1) and `LlmProposer` (task 10.2, mock).
+
+**Raw candidates diverge:** `LatticeSearchProposer` returns 1 candidate (the operator-reachable one). `LlmProposer`'s mock response includes a wrong-severity hallucination (ontology-valid, clinically wrong) plus two malformed/unknown-system lines dropped silently at parsing — yielding 2 raw candidates.
+
+**Both pass through `propose_verify`** with independently-constructed `OperatorSet` instances (three total: one per lattice search, one per licensing check per proposer — see "Structuring tests for safety verification" in `CLAUDE.md`). The wrong-severity hallucination survives Stage 1 (it is a well-formed atom) but is rejected at Stage 2 licensing, since it is not a member of `OperatorSet::apply_set()`'s result.
+
+**Result:** `lattice_verify.licensed_candidates == llm_verify.licensed_candidates` — mechanically asserted, not just narrated. Despite divergent raw candidate sets, the licensed outcome is identical across proposer architectures. **OBL-PS-05 holds, and the substrate-first claim is demonstrated empirically.** ✓
+
+**Evidence:** `clinlat/examples/substrate_invariance_sepsis.rs`; companion write-up in `clinlat/docs/examples/example_substrate_invariance_sepsis.md`; generalized over ≥10 paired cases by the property tests in `clinlat/src/proposer.rs` ("Substrate-Invariance Tests", task 11.2).
+
+---
+
 ## Discharge Scope and Tier
 
 **Discharge tier:** Property-test (v0.2.0-alpha.0+).
