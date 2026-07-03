@@ -89,7 +89,7 @@ The M1 Definition of Done (met, shipped 2026-05-31) and the M1 out-of-scope back
 |------|---------|-----|---------|--------|
 | 11.1 | OBL-PS-05 discharge doc | `clinlat/docs/obligations/obl-ps-05-proposer-constraint.md`; discharges OBL-PS-05 at property-test tier; enumerates the property tests from 9.2 and 10.3 as the discharge evidence; states tier (property-test) and residual informal-argument gaps; links DEF-PS-14/15, INV-PS-06 | 9.2, 10.3 | cc:done [190cbe5] |
 | 11.2 | Substrate-invariance test (proposer swap) | Property/integration test feeding the **same** evidence + hypothesis through `LatticeSearchProposer` and `LlmProposer` (mock, returning a superset incl. hallucinations); assert the post-soundness-gate refinement applied by the substrate is **identical** across the swap (substrate behavior independent of proposer architecture per NOTE.md §3, §5). ≥10 paired cases. | 8.5, 9.1, 10.2 [tdd:required] | cc:done [bad9c35] |
-| 11.3 | Worked example: substrate-first claim | Side-by-side worked example (sepsis-3 state) showing both proposers yield the same substrate outcome despite divergent candidate sets; documents the empirical demonstration referenced in the M2 DoD. | 11.2 | cc:done [PENDING] |
+| 11.3 | Worked example: substrate-first claim | Side-by-side worked example (sepsis-3 state) showing both proposers yield the same substrate outcome despite divergent candidate sets; documents the empirical demonstration referenced in the M2 DoD. | 11.2 | cc:done [d033171] |
 
 ---
 
