@@ -1,10 +1,10 @@
 # SFClinAI — Plans.md
 
 **Project:** clinlat substrate kernel
-**Current Milestone:** M2 — Constrained refinement proposer
+**Current Milestone:** M2 — Constrained refinement proposer (✓ Complete, shipped 2026-07-10)
 **Previous Milestone:** M1 (✓ Complete, shipped 2026-05-31)
 **Created:** 2026-05-25
-**Status:** M2 complete, including release prep (Phases 8–12). `clinlat` crate ready for the `clinlat-v0.3.0` tag/publish (pending via `/harness-release`).
+**Status:** M2 shipped. `clinlat-v0.3.0` tagged (`dcd6226`), GitHub Release published (https://github.com/SHA888/SFClinAI/releases/tag/clinlat-v0.3.0), and published to crates.io.
 **Architectural Scope:** Complete NOTE.md §4A.5 / SPEC.md §2.7 / ARCHITECTURE.md Diagram 3 and 5 patient-substrate proposer slots.
 
 ---
@@ -115,23 +115,20 @@ The M1 Definition of Done (met, shipped 2026-05-31) and the M1 out-of-scope back
 ✓ INV-PS-06 enforced by structural test (8.6), not argument alone
 ✓ OBL-PS-05 discharged at property-test tier across both reference proposers (11.1)
 ✓ Substrate behavior identical across proposer swap for the same evidence — substrate-first claim demonstrated empirically (11.2, 11.3)
-✓ `clinlat-v0.3.0` release-prepped: CHANGELOG promoted, `Cargo.toml` bumped, CI matrix green (299 tests, fmt, clippy, doc), `cargo publish --dry-run` clean (Phase 12). Actual tag/publish is a separate `/harness-release` step.
+✓ `clinlat-v0.3.0` released: CHANGELOG promoted, `Cargo.toml` bumped, CI matrix green (299 tests, fmt, clippy, doc), `cargo publish --dry-run` clean (Phase 12) — then tagged (`dcd6226`), GitHub Release published, and published to crates.io (2026-07-10)
 
 ---
 
 ## Next session startup
+
+**M2 is fully shipped** (`clinlat-v0.3.0`: tagged, GitHub Release published, live on crates.io as of 2026-07-10). There is no open task in this file — Phases 8–12 are all `cc:done`.
 
 **New session command:**
 ```bash
 claude
 ```
 
-**First input:**
-```
-/harness-work 12.1-12.4
-```
-
-**Rationale:** Phases 8–11 (the M2 implementation) are all `cc:done`. The only remaining work before the `clinlat-v0.3.0` tag is Phase 12 (release prep): promote the CHANGELOG entry (12.1), document the proposer examples in README (12.2), bump `Cargo.toml` and verify the CI matrix (12.3), and confirm `cargo publish --dry-run` (12.4). These are sequential (each depends on the prior), so Solo or a small Parallel run is sufficient — Breezing's three-way split isn't needed for 4 tasks. Once Phase 12 is `cc:done`, re-run `/harness-release` to perform the actual tag/PR/GitHub-Release step.
+**First input:** none required yet. The next unit of work is scoping **M3 — Institutional substrate kernel** (`clinlat-v0.4.0` per `TODO.md`), which has no `Plans.md` task table yet. Start a new session with something like `/harness-plan M3` or discuss scope first — NOTE.md §4B (institutional-state substrate) and SPEC.md §3 are the source material, mirroring how M2 mirrored §4A/§2.
 
 ---
 

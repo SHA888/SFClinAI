@@ -52,7 +52,7 @@ Per-task detail with commit hashes: see `Plans.md`. Architectural coverage at v0
 
 **Architectural scope:** `NOTE.md` §4A.5 / `SPEC.md` §2.7 / `ARCHITECTURE.md` Diagrams 3 and 5 patient-substrate slots.
 
-**Status:** ✓ All `Plans.md` tasks (8.1–11.3) complete. Crate is still at v0.2.0 in `Cargo.toml`/`clinlat-v0.2.0` tag — version bump and publish to v0.3.0 not yet done (see note below).
+**Status:** ✓ Shipped 2026-07-10. All `Plans.md` tasks (8.1–12.4) complete, including release prep (Phase 12) and the release itself: tagged `clinlat-v0.3.0` (commit `dcd6226`), [GitHub Release published](https://github.com/SHA888/SFClinAI/releases/tag/clinlat-v0.3.0), and live on crates.io.
 
 - ✓ **M2.1 Black-box proposer interface** — `RefinementProposer` trait per DEF-PS-14 (task 8.1); `ProposerConstraint` input/output ontology gates per DEF-PS-15 (task 8.2); `propose_and_filter` adapter (task 8.3). *(Phase 8, commits 102a8e9, 9cfdfd3, 78c01f3)*
 - ✓ **M2.2 Soundness verification adapter** — `propose_verify` routes constraint-passing candidates through `OperatorSet.apply_set()` (Diagram 3 `SV` node); emits `AbstainReason::NoOperatorLicenses` when nothing is licensed (task 8.5). *(Phase 8, commit 77c954c)*
@@ -68,7 +68,7 @@ Per-task detail with commit hashes: see `Plans.md`. Architectural coverage at v0
 - ✓ OBL-PS-05 discharged at property-test tier across both reference proposers
 - ✓ Substrate behavior identical across proposer swap for the same evidence — substrate-first claim demonstrated empirically
 
-**Remaining before the `clinlat-v0.3.0` release tag:** `Cargo.toml` version bump, CHANGELOG entry, `cargo publish --dry-run`, and a release tag. Unlike M1 (which had an explicit Phase 7 release phase), M2's `Plans.md` does not yet include a release/publish task — add one before tagging v0.3.0.
+**Release commits:** `1c68ecf` (pre-existing test-bug fix, unrelated to M2 scope), `9f05aae` (CHANGELOG), `edd1aca` (README), `f004918` (version bump + CI matrix), `dcd6226` (release-prep complete). Tag `clinlat-v0.3.0` points at `dcd6226`.
 
 ---
 
