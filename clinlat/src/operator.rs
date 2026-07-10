@@ -846,10 +846,25 @@ mod proptest_galois_laws {
                 "Unknown hypothesis should be consistent with all evidence");
         }
 
+        /// Every distinct valid observation code produces exactly one atom.
+        ///
+        /// `Hyp::new` deduplicates atoms by full equality (system, code,
+        /// preferred_term, version) per its poset invariant (see `hyp.rs`
+        /// doc comment on `Hyp::new`), so a naive `hyp.atoms().len() ==
+        /// codes.len()` is false whenever the generated `codes` vec
+        /// contains a repeated code string (e.g. `["ICD11:498",
+        /// "ICD11:498"]`) — two identical observations always parse to two
+        /// identical atoms, which collapse to one. Compare against the
+        /// distinct code count instead so the property holds regardless of
+        /// duplicates the strategy happens to generate.
         #[test]
         fn prop_abstraction_completeness(
             codes in prop::collection::vec(observation_code_strategy(), 1..4),
         ) {
+            let mut distinct_codes = codes.clone();
+            distinct_codes.sort();
+            distinct_codes.dedup();
+
             let observations: Vec<Observation> = codes
                 .iter()
                 .map(|code| Observation::new(code.clone(), serde_json::json!(1)))
@@ -866,8 +881,8 @@ mod proptest_galois_laws {
 
             let hyp = abstract_evidence(&evidence);
 
-            prop_assert_eq!(hyp.atoms().len(), codes.len(),
-                "All valid observation codes should produce atoms");
+            prop_assert_eq!(hyp.atoms().len(), distinct_codes.len(),
+                "Each distinct valid observation code should produce exactly one atom");
             prop_assert!(is_consistent_with(&hyp, &evidence),
                 "Abstraction should be consistent with evidence");
         }
