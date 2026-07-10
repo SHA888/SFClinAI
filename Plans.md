@@ -4,7 +4,7 @@
 **Current Milestone:** M2 — Constrained refinement proposer
 **Previous Milestone:** M1 (✓ Complete, shipped 2026-05-31)
 **Created:** 2026-05-25
-**Status:** M2 implementation complete (Phases 8–11); release prep (Phase 12) pending before `clinlat-v0.3.0` tag
+**Status:** M2 complete, including release prep (Phases 8–12). `clinlat` crate ready for the `clinlat-v0.3.0` tag/publish (pending via `/harness-release`).
 **Architectural Scope:** Complete NOTE.md §4A.5 / SPEC.md §2.7 / ARCHITECTURE.md Diagram 3 and 5 patient-substrate proposer slots.
 
 ---
@@ -100,10 +100,10 @@ The M1 Definition of Done (met, shipped 2026-05-31) and the M1 out-of-scope back
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
 | 12.0 | Fix pre-existing `prop_abstraction_completeness` test bug (blocks 12.3's "cargo test green" DoD) | `operator.rs`'s `prop_abstraction_completeness` asserted `hyp.atoms().len() == codes.len()`, but `Hyp::new` deduplicates atoms by full equality (poset invariant); duplicate generated observation codes (e.g. `["ICD11:498","ICD11:498"]`) parse to identical atoms that collapse to one, so the naive count assertion is false whenever the proptest strategy generates a duplicate. Fixed by comparing against the distinct-code count instead. Unrelated to M2 scope — pre-existing, confirmed via `git stash` isolation 2026-07-03 (see harness-mem M2 status note). All 299 tests pass after fix. | none | cc:done [1c68ecf] |
-| 12.1 | Write real `[0.3.0]` CHANGELOG entry | Replace `clinlat/CHANGELOG.md`'s `[Unreleased] → Planned for 0.3.0` bullets with a dated `## [0.3.0]` section in Keep-a-Changelog `### Added` style (matching the `[0.2.0]` entry's structure), covering: `RefinementProposer` trait (DEF-PS-14), `ProposerConstraint` gates (DEF-PS-15), `propose_and_filter`/`propose_verify` adapters, INV-PS-06 structural enforcement, `LatticeSearchProposer`, `LlmProposer`, OBL-PS-05 discharge, and the three worked examples (9.3, 10.4, 11.3); links to the relevant `docs/obligations/` and `docs/invariants/` files | 11.1, 11.2, 11.3 | cc:todo |
-| 12.2 | Update `clinlat/README.md` with M2 examples | Add a proposer usage example (`LatticeSearchProposer` and/or `LlmProposer` against `propose_verify`) alongside the existing M1 operator examples; update crate status/milestone section to reflect M2; cross-links to `docs/obligations/obl-ps-05-proposer-constraint.md` and `docs/invariants/inv-ps-06-proposer-safety.md`; doc tests pass | 12.1 | cc:todo |
-| 12.3 | Bump `Cargo.toml` to `0.3.0`; verify CI matrix green | `clinlat/Cargo.toml` version = `0.3.0`; `cargo test`, `cargo doc --no-deps`, `cargo fmt --check`, `cargo clippy` (no warnings), `cargo check` all green | 12.1, 12.2 | cc:todo |
-| 12.4 | Dry-run publish verification | `cargo publish --dry-run` succeeds without errors from within `clinlat/`; crate package contents verified ready for crates.io | 12.3 | cc:todo |
+| 12.1 | Write real `[0.3.0]` CHANGELOG entry | Replace `clinlat/CHANGELOG.md`'s `[Unreleased] → Planned for 0.3.0` bullets with a dated `## [0.3.0]` section in Keep-a-Changelog `### Added` style (matching the `[0.2.0]` entry's structure), covering: `RefinementProposer` trait (DEF-PS-14), `ProposerConstraint` gates (DEF-PS-15), `propose_and_filter`/`propose_verify` adapters, INV-PS-06 structural enforcement, `LatticeSearchProposer`, `LlmProposer`, OBL-PS-05 discharge, and the three worked examples (9.3, 10.4, 11.3); links to the relevant `docs/obligations/` and `docs/invariants/` files | 11.1, 11.2, 11.3 | cc:done [9f05aae] |
+| 12.2 | Update `clinlat/README.md` with M2 examples | Add a proposer usage example (`LatticeSearchProposer` and/or `LlmProposer` against `propose_verify`) alongside the existing M1 operator examples; update crate status/milestone section to reflect M2; cross-links to `docs/obligations/obl-ps-05-proposer-constraint.md` and `docs/invariants/inv-ps-06-proposer-safety.md`; doc tests pass | 12.1 | cc:done [edd1aca] |
+| 12.3 | Bump `Cargo.toml` to `0.3.0`; verify CI matrix green | `clinlat/Cargo.toml` version = `0.3.0`; `cargo test`, `cargo doc --no-deps`, `cargo fmt --check`, `cargo clippy` (no warnings), `cargo check` all green | 12.1, 12.2 | cc:done [f004918] |
+| 12.4 | Dry-run publish verification | `cargo publish --dry-run` succeeds without errors from within `clinlat/`; crate package contents verified ready for crates.io | 12.3 | cc:done [verified] |
 
 ---
 
@@ -115,7 +115,7 @@ The M1 Definition of Done (met, shipped 2026-05-31) and the M1 out-of-scope back
 ✓ INV-PS-06 enforced by structural test (8.6), not argument alone
 ✓ OBL-PS-05 discharged at property-test tier across both reference proposers (11.1)
 ✓ Substrate behavior identical across proposer swap for the same evidence — substrate-first claim demonstrated empirically (11.2, 11.3)
-- [ ] `clinlat-v0.3.0` released: CHANGELOG promoted, `Cargo.toml` bumped, CI matrix green, `cargo publish --dry-run` clean (Phase 12)
+✓ `clinlat-v0.3.0` release-prepped: CHANGELOG promoted, `Cargo.toml` bumped, CI matrix green (299 tests, fmt, clippy, doc), `cargo publish --dry-run` clean (Phase 12). Actual tag/publish is a separate `/harness-release` step.
 
 ---
 
