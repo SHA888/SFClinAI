@@ -11,12 +11,87 @@ Pre-1.0 minor bumps (`0.x.0`) carry breaking changes by SemVer convention.
 Tracking what is not yet on a published version. See `Plans.md` for the
 authoritative phase-by-phase task list.
 
-### Planned for `0.3.0` (M2 — Constrained refinement proposer)
+## [0.3.0] — 2026-07-10
 
-- Black-box proposer interface per DEF-PS-14 / DEF-PS-15 (INV-PS-06).
-- Soundness verification adapter wiring proposer output through safety gates.
-- Two reference proposers: deterministic lattice search + LLM-class adapter.
-- OBL-PS-05 discharge (proposer-operator separation enforced structurally).
+**Milestone M2: Constrained refinement proposer.** Diagram 3 boundary
+contract (input gate → proposer → output gate → soundness-verification →
+abstention) realized end-to-end; Diagram 5 patient-side proposer slot `RP`
+filled by two independent architectures. 299 tests passing.
+
+### Added
+
+- **`RefinementProposer` trait (Phase 8):** black-box proposer signature per
+  DEF-PS-14 — `fn propose(&self, h: &Hyp, e: &Evidence) -> Set<Hyp>` — typed
+  so a proposer can only return candidates, never make a licensing decision
+  itself. See `src/proposer.rs`.
+- **`ProposerConstraint` gates (Phase 8):** input- and output-side ontology
+  gates per DEF-PS-15 — rejects out-of-ontology evidence/hypotheses before
+  proposal (input gate) and rejects any candidate that is not
+  ontology-bounded or more than one operator step from the input (output
+  gate). Returns a structured error per failed clause. See
+  `src/proposer.rs::ProposerConstraint`.
+- **`propose_and_filter` / `propose_verify` adapters (Phase 8):**
+  `propose_and_filter` wraps a proposer call with the `ProposerConstraint`
+  filter and returns `(valid_candidates, filtered_out_count,
+  filter_errors)` with an audit trail of filtering decisions.
+  `propose_verify` additionally routes constraint-passing candidates through
+  `OperatorSet::apply_set()` (the Diagram 3 `SV` node); when no candidate is
+  licensed by any operator it emits `AbstainReason::NoOperatorLicenses`
+  rather than an empty set. See `src/proposer.rs`.
+- **INV-PS-06 structural enforcement (Phase 8):** informal-argument proof
+  (`docs/invariants/inv-ps-06-proposer-safety.md`) plus a dedicated
+  structural test — ≥10 property cases over adversarial proposers returning
+  out-of-ontology candidates, all filtered to empty by `propose_and_filter`/
+  `propose_verify`.
+- **`LatticeSearchProposer` (Phase 9):** exhaustive breadth-first search of
+  every hypothesis reachable from the input via a single operator
+  application; trivially sound by construction. Property-tested for
+  completeness (every one-step-reachable hypothesis is returned),
+  minimality (no spurious candidates), and monotonicity, ~27 distinct
+  property cases after a code-review pass removed duplicate coverage. See
+  `src/lattice_search.rs`.
+- **`LlmProposerConfig` / `LlmProposer` (Phase 10):** configuration struct
+  for an LLM-backed proposer (endpoint, model, prompt template, temperature,
+  reproducibility seed, offline mock mode for CI) and the adapter that
+  builds a prompt, calls the model, parses the response into candidate
+  hypotheses, and filters through `ProposerConstraint`. Failed parses or
+  out-of-constraint responses are logged as "LLM hallucinations" and
+  silently filtered by the ontology gate. Property-tested: every
+  constraint-passing LLM candidate is usable by an operator (safety); the
+  system still refines correctly regardless of how the LLM hallucinates
+  (robustness); responses and filtering decisions are recorded in the audit
+  trail. See `src/llm_proposer_config.rs`, `src/llm_proposer.rs`.
+- **OBL-PS-05 discharge (Phase 11):** proposer-constraint obligation
+  discharged at property-test tier across both reference proposers
+  (`docs/obligations/obl-ps-05-proposer-constraint.md`), enumerating the
+  Phase 9/10 property tests as discharge evidence.
+- **Substrate-invariance test (Phase 11):** ≥10 paired cases feeding
+  identical evidence through `LatticeSearchProposer` and `LlmProposer` (mock,
+  including hallucinations) and asserting the post-soundness-gate refinement
+  is identical across the proposer swap — the substrate-first claim
+  (`NOTE.md` §3, §5) demonstrated as a property, not just an example.
+- **Three worked examples:** SOFA + KDIGO lattice search on a sepsis-3
+  state (`docs/examples/example_sofa_kdigo_proposer.md`); LLM proposer on
+  sepsis-3 showing a hallucination filtered and a valid candidate accepted
+  (`docs/examples/example_llm_proposer_sepsis.md`); side-by-side substrate-
+  first demonstration of both proposers on the same sepsis-3 state
+  (`docs/examples/example_substrate_invariance_sepsis.md`).
+
+### Fixed
+
+- **Pre-existing Galois-completeness proptest bug (unrelated to M2):**
+  `prop_abstraction_completeness` asserted an atom count equal to the raw
+  generated-code count, but `Hyp::new` deduplicates atoms by full equality
+  per its poset invariant, so duplicate generated observation codes made the
+  assertion false. Fixed by comparing against the distinct-code count.
+
+### Verified
+
+- ✓ `cargo test --lib`: 299 tests passing
+- ✓ `cargo doc --no-deps`: full docs render without warnings
+- ✓ `cargo fmt --check`: code formatted
+- ✓ `cargo clippy -- -D warnings`: no clippy warnings
+- ✓ `cargo publish --dry-run`: package ready for crates.io
 
 ## [0.2.0] — 2026-05-31
 
