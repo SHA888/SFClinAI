@@ -48,18 +48,27 @@ Per-task detail with commit hashes: see `Plans.md`. Architectural coverage at v0
 
 ---
 
-## Milestone M2 — Constrained refinement proposer (`clinlat-v0.3.0`)
+## ✓ Completed: Milestone M2 — Constrained refinement proposer (`clinlat-v0.3.0`)
 
 **Architectural scope:** `NOTE.md` §4A.5 / `SPEC.md` §2.7 / `ARCHITECTURE.md` Diagrams 3 and 5 patient-substrate slots.
 
-- [ ] **M2.1 Black-box proposer interface** — typed signature per DEF-PS-14 with input-side and output-side ontology gates (Diagram 3).
-- [ ] **M2.2 Soundness verification adapter** — wires proposer output through soundness gate (Diagram 3 `SV` node) and emits abstention if no operator licenses.
-- [ ] **M2.3 INV-PS-06 enforcement** — proposer outputs always within ontology bounds; structural test.
-- [ ] **M2.4 Reference proposer #1: deterministic search** — exhaustive lattice-search proposer for small operator sets; trivially sound by construction; serves as ground truth.
-- [ ] **M2.5 Reference proposer #2: LLM-class adapter** — wrapper around a foundation-model API call with output-side ontology gate. Demonstrates the substrate-first claim (`NOTE.md` §3, §5): the LLM can be wrong without the system being unsafe.
-- [ ] **M2.6 OBL-PS-05 discharge** — proposer constraint obligations discharged at property-test tier across both reference proposers.
+**Status:** ✓ All `Plans.md` tasks (8.1–11.3) complete. Crate is still at v0.2.0 in `Cargo.toml`/`clinlat-v0.2.0` tag — version bump and publish to v0.3.0 not yet done (see note below).
 
-**Definition of Done:** Diagram 3 boundary contract realized end-to-end; Diagram 5 patient-side slot RP filled by at least two architectures (deterministic and LLM-class); substrate behavior identical across proposer swap for the same evidence (substrate-first claim demonstrated empirically).
+- ✓ **M2.1 Black-box proposer interface** — `RefinementProposer` trait per DEF-PS-14 (task 8.1); `ProposerConstraint` input/output ontology gates per DEF-PS-15 (task 8.2); `propose_and_filter` adapter (task 8.3). *(Phase 8, commits 102a8e9, 9cfdfd3, 78c01f3)*
+- ✓ **M2.2 Soundness verification adapter** — `propose_verify` routes constraint-passing candidates through `OperatorSet.apply_set()` (Diagram 3 `SV` node); emits `AbstainReason::NoOperatorLicenses` when nothing is licensed (task 8.5). *(Phase 8, commit 77c954c)*
+- ✓ **M2.3 INV-PS-06 enforcement** — informal-argument proof doc (task 8.4) plus dedicated structural test with ≥10 property cases over adversarial out-of-ontology proposers (task 8.6). *(Phase 8, commits cb83a95, e1e62a8)*
+- ✓ **M2.4 Reference proposer #1: deterministic search** — `LatticeSearchProposer` exhaustive BFS (task 9.1); completeness/minimality/monotonicity property tests, refined after code review (tasks 9.2, 9.2-fix); SOFA+KDIGO sepsis-3 worked example (task 9.3). *(Phase 9, commits 7bfdd94, 0ca7ba8, 989883b, 6bf6e96)*
+- ✓ **M2.5 Reference proposer #2: LLM-class adapter** — `LlmProposerConfig` with offline mock mode (task 10.1); `LlmProposer` adapter wrapping prompt→LLM→parse→`ProposerConstraint` filter (task 10.2); safety/robustness property tests over hallucinated and valid mock responses (task 10.3); sepsis-3 LLM worked example (task 10.4). *(Phase 10, commits 00aa6b6, aa1ad40, 56abd18, cd25fba)*
+- ✓ **M2.6 OBL-PS-05 discharge** — discharge doc at property-test tier across both proposers (task 11.1); substrate-invariance test proving identical post-soundness-gate refinement across a proposer swap, ≥10 paired cases (task 11.2); side-by-side sepsis-3 worked example demonstrating the substrate-first claim (task 11.3). *(Phase 11, commits 190cbe5, bad9c35, d033171, 56cdacb)*
+
+**Definition of Done — ✓ All criteria met:**
+- ✓ Diagram 3 boundary contract realized end-to-end: input gate → proposer → output gate → soundness-verification (`SV`) node → abstention path
+- ✓ Diagram 5 patient-side proposer slot `RP` filled by two architectures: deterministic lattice search and LLM-class adapter
+- ✓ INV-PS-06 enforced by structural test, not argument alone
+- ✓ OBL-PS-05 discharged at property-test tier across both reference proposers
+- ✓ Substrate behavior identical across proposer swap for the same evidence — substrate-first claim demonstrated empirically
+
+**Remaining before the `clinlat-v0.3.0` release tag:** `Cargo.toml` version bump, CHANGELOG entry, `cargo publish --dry-run`, and a release tag. Unlike M1 (which had an explicit Phase 7 release phase), M2's `Plans.md` does not yet include a release/publish task — add one before tagging v0.3.0.
 
 ---
 
