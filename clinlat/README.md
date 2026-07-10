@@ -2,8 +2,8 @@
 
 A Rust substrate for symbolic clinical decision-making based on refinable hypothesis lattices and sound deduction operators.
 
-**Version:** 0.2.0-alpha.0
-**Status:** M1 milestone in progress (Patient substrate completion; Phases 0–3 of 7 shipped)
+**Version:** 0.3.0
+**Status:** M2 milestone complete (Constrained refinement proposer)
 
 ## Overview
 
@@ -225,6 +225,80 @@ The CURB-65 operator stratifies community-acquired pneumonia (CAP) severity for 
 
 See [`clinlat/docs/operators/curb65_soundness.md`](docs/operators/curb65_soundness.md) for soundness argument.
 
+### Constrained Refinement Proposer (M2)
+
+A [`RefinementProposer`] is a black-box that suggests candidate refinements —
+it never decides on its own; every candidate must still pass the ontology
+gates ([`ProposerConstraint`], DEF-PS-15) and the soundness-verification gate
+(`propose_verify`, the Diagram 3 `SV` node) before it can be used. This is
+what lets `clinlat` plug in an untrusted or even hallucinating proposer (see
+the [`LlmProposer`](#llm-class-proposer-m2) below) without weakening the
+substrate's safety guarantee.
+
+```rust
+use clinlat::{Hyp, LatticeSearchProposer, OperatorMetadata, OperatorSet, SofaRespOperator, propose_verify};
+# use std::collections::BTreeMap;
+# use chrono::Utc;
+# use clinlat::{Evidence, Observation, Provenance, ProvenanceOrigin, Ver};
+# let evidence = Evidence::new(
+#     vec![
+#         Observation::new("LOINC:2703-7", serde_json::json!(180.0)).with_unit("mmHg"),
+#         Observation::new("LOINC:3150-0", serde_json::json!(1.0)),
+#     ],
+#     Provenance::new(
+#         ProvenanceOrigin::new("external_lab_api", "LOINC", "2703-7"),
+#         Utc::now(),
+#         Ver::new("clinlat", "lab_ingest", "0.1.0"),
+#         BTreeMap::new(),
+#     ),
+# );
+
+// Independent OperatorSet instances — one drives the proposer's search space,
+// one drives the soundness gate — per this repo's test/usage discipline that
+// shared-instance construction can mask non-determinism (see CLAUDE.md).
+let search_operators = OperatorSet::new().register(
+    Box::new(SofaRespOperator::default_v0_2()),
+    OperatorMetadata { name: "SofaRespOperator".to_string(), version: "0.2.0".to_string() },
+);
+let gate_operators = OperatorSet::new().register(
+    Box::new(SofaRespOperator::default_v0_2()),
+    OperatorMetadata { name: "SofaRespOperator".to_string(), version: "0.2.0".to_string() },
+);
+
+let proposer = LatticeSearchProposer::new(search_operators);
+
+match propose_verify(&proposer, &gate_operators, &Hyp::unknown(), &evidence) {
+    Ok(result) => {
+        // Every candidate here is provably reachable by an operator (INV-PS-06).
+        println!("Licensed candidates: {:?}", result.licensed_candidates);
+    }
+    Err(reason) => println!("Abstained: {:?}", reason),
+}
+```
+
+`LatticeSearchProposer` is trivially sound by construction (exhaustive search
+over one-operator-step reachable hypotheses). See
+[`docs/examples/example_sofa_kdigo_proposer.md`](docs/examples/example_sofa_kdigo_proposer.md)
+for a worked SOFA + KDIGO example.
+
+#### LLM-Class Proposer (M2)
+
+`LlmProposer` wraps a foundation-model API call (or an offline mock, for
+CI/testing) behind the same `RefinementProposer` interface. The LLM can
+hallucinate freely — invalid responses are filtered by `ProposerConstraint`
+and logged as filtered candidates — while the substrate's refinement
+behavior stays identical to a run through `LatticeSearchProposer` on the
+same evidence. See
+[`docs/examples/example_llm_proposer_sepsis.md`](docs/examples/example_llm_proposer_sepsis.md)
+(hallucination filtered, valid candidate accepted) and
+[`docs/examples/example_substrate_invariance_sepsis.md`](docs/examples/example_substrate_invariance_sepsis.md)
+(side-by-side proposer swap showing identical substrate output).
+
+Proposer safety is discharged in two documents:
+
+- [`docs/invariants/inv-ps-06-proposer-safety.md`](docs/invariants/inv-ps-06-proposer-safety.md) — proves no proposer output can bypass `OperatorSet::apply_set()`.
+- [`docs/obligations/obl-ps-05-proposer-constraint.md`](docs/obligations/obl-ps-05-proposer-constraint.md) — OBL-PS-05 discharge at property-test tier across both reference proposers.
+
 ## Architecture
 
 ### Hypothesis Lattice
@@ -289,26 +363,37 @@ All soundness arguments discharge **OBL-PS-03** (Operator set soundness) and sat
 
 **Formal reference:** See [`SPEC.md` §2 (Patient-state substrate)](../SPEC.md) and [`SPEC.md` §8 (Bidirectional traceability)](../SPEC.md) for the complete formalization of operator soundness and the mapping from principles (NOTE.md §4A) to formal definitions.
 
-## v0.2.0-alpha Status
+## Status
 
-**M1 Milestone (Patient substrate completion): Phases 0–6 complete.**
+**M1 (Patient substrate completion, `v0.2.0`, shipped 2026-05-31):** all eleven
+4A-anchored SPEC.md elements (DEF-PS-01..15, INV-PS-01..06, OBL-PS-01..05)
+reachable from running code; four operators discharged (SOFA at
+property-test tier, KDIGO/Wells/CURB-65 at informal-argument tier).
 
-What has shipped:
+**M2 (Constrained refinement proposer, `v0.3.0`) — complete:**
 
-- **`Atom`** (Phase 1): replaces `&'static str` AtomId with `{ system, code, preferred_term, version }`. Resolved through four `OntologyAdapter` implementations: SNOMED CT, RxNorm, LOINC, ICD-11.
-- **`Evidence`** (Phase 2): typed `{ observations: Vec<Observation>, provenance: Provenance }` carrying clinical observations and audit-trail provenance (DEF-PS-12, DEF-PS-13).
-- **`Provenance`** (Phase 2): typed carrier with origin, ISO 8601 timestamp, operator version, metadata, and optional `derives_from` hashes (DEF-MP-14, OBL-PS-04). JSON serializable with optional gzip compression.
-- **`SofaRespOperator`** (Phase 2): full `Operator::apply()` implementation with version-respecting derivation chain enforcement — the operator abstains rather than silently process evidence whose provenance version does not match (INV-PS-05).
-- **Galois connection** (Phase 3): abstraction `abstract_evidence` (α_PS) and the concretization predicate `is_consistent_with` (γ_PS) property-tested for the adjunction laws — `e ∈ γ_PS(α_PS(e))`, `α_PS(γ_PS(h)) ⊑ h`, and monotonicity — discharging OBL-PS-02 at the property-test tier. See [`docs/obligations/obl-ps-02-adjunction.md`](docs/obligations/obl-ps-02-adjunction.md).
-- **`OperatorSet`** type and composition (Phase 4): formalized per DEF-PS-09 / OBL-PS-03 with propagate-forward semantics for abstention handling. See [`docs/obligations/obl-ps-03-operator-set-sound.md`](docs/obligations/obl-ps-03-operator-set-sound.md).
-- **Three additional operators** (Phase 5): `KdigoAkiOperator`, `WellsPeOperator`, `Curb65Operator` with 27 unit tests and soundness discharge documents at informal-argument tier. All critical code-review bugs (9 total) fixed and verified.
-- **SOFA-respiratory upgrade** (Phase 6): from informal-argument tier to property-test tier with 17 new property-test cases (46 total: 29 unit + 17 property). See [`docs/operators/sofa_resp_soundness.md`](docs/operators/sofa_resp_soundness.md).
+- **`RefinementProposer` / `ProposerConstraint`** (Phase 8): black-box
+  proposer interface (DEF-PS-14) with input- and output-side ontology gates
+  (DEF-PS-15); `propose_and_filter` and `propose_verify` adapters wire
+  proposer output through the soundness-verification gate with structured
+  abstention (`AbstainReason::NoOperatorLicenses`); INV-PS-06 enforced by a
+  dedicated structural test, not argument alone.
+- **`LatticeSearchProposer`** (Phase 9): exhaustive one-operator-step search,
+  trivially sound by construction; ~27 property cases for completeness,
+  minimality, and monotonicity.
+- **`LlmProposer`** (Phase 10): foundation-model adapter (with offline mock
+  mode for CI) demonstrating the substrate-first claim — hallucinated
+  candidates are filtered, valid candidates pass through, and system
+  behavior stays sound either way.
+- **OBL-PS-05 discharge + substrate-invariance** (Phase 11): property-test
+  tier discharge across both proposers, plus a ≥10-case paired test proving
+  identical post-soundness-gate refinement across a proposer swap for the
+  same evidence — see [`docs/obligations/obl-ps-05-proposer-constraint.md`](docs/obligations/obl-ps-05-proposer-constraint.md).
 
-**Currently** (Phase 7): Release prep — README/SPEC cross-references, full CI verification, publish dry-run.
+See the [Constrained Refinement Proposer](#constrained-refinement-proposer-m2)
+section above for usage, and `CHANGELOG.md` for the full `[0.3.0]` entry.
 
-Test coverage: **193 tests passing** (all operators, all phases).
-
-Pre-release versioning (`0.2.0-alpha.N`) is used while Phase 7 lands; the suffix is dropped on the cut to `0.2.0`.
+Test coverage: **299 tests passing** (all operators, both proposers, all phases).
 
 ## References
 
