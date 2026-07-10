@@ -4,7 +4,7 @@
 **Current Milestone:** M2 — Constrained refinement proposer
 **Previous Milestone:** M1 (✓ Complete, shipped 2026-05-31)
 **Created:** 2026-05-25
-**Status:** M2 In progress
+**Status:** M2 implementation complete (Phases 8–11); release prep (Phase 12) pending before `clinlat-v0.3.0` tag
 **Architectural Scope:** Complete NOTE.md §4A.5 / SPEC.md §2.7 / ARCHITECTURE.md Diagram 3 and 5 patient-substrate proposer slots.
 
 ---
@@ -93,6 +93,20 @@ The M1 Definition of Done (met, shipped 2026-05-31) and the M1 out-of-scope back
 
 ---
 
+## Phase 12: Integration and release (M2.7)
+
+**Goal:** Same shape as M1's Phase 7 — promote the M2 implementation (Phases 8–11) into a documented, version-bumped, publish-verified crate state ready for the `clinlat-v0.3.0` tag. `/harness-release` performs the actual tag/PR/GitHub-Release step once this phase is `cc:done`; this phase only prepares the artifact.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 12.0 | Fix pre-existing `prop_abstraction_completeness` test bug (blocks 12.3's "cargo test green" DoD) | `operator.rs`'s `prop_abstraction_completeness` asserted `hyp.atoms().len() == codes.len()`, but `Hyp::new` deduplicates atoms by full equality (poset invariant); duplicate generated observation codes (e.g. `["ICD11:498","ICD11:498"]`) parse to identical atoms that collapse to one, so the naive count assertion is false whenever the proptest strategy generates a duplicate. Fixed by comparing against the distinct-code count instead. Unrelated to M2 scope — pre-existing, confirmed via `git stash` isolation 2026-07-03 (see harness-mem M2 status note). All 299 tests pass after fix. | none | cc:done [1c68ecf] |
+| 12.1 | Write real `[0.3.0]` CHANGELOG entry | Replace `clinlat/CHANGELOG.md`'s `[Unreleased] → Planned for 0.3.0` bullets with a dated `## [0.3.0]` section in Keep-a-Changelog `### Added` style (matching the `[0.2.0]` entry's structure), covering: `RefinementProposer` trait (DEF-PS-14), `ProposerConstraint` gates (DEF-PS-15), `propose_and_filter`/`propose_verify` adapters, INV-PS-06 structural enforcement, `LatticeSearchProposer`, `LlmProposer`, OBL-PS-05 discharge, and the three worked examples (9.3, 10.4, 11.3); links to the relevant `docs/obligations/` and `docs/invariants/` files | 11.1, 11.2, 11.3 | cc:todo |
+| 12.2 | Update `clinlat/README.md` with M2 examples | Add a proposer usage example (`LatticeSearchProposer` and/or `LlmProposer` against `propose_verify`) alongside the existing M1 operator examples; update crate status/milestone section to reflect M2; cross-links to `docs/obligations/obl-ps-05-proposer-constraint.md` and `docs/invariants/inv-ps-06-proposer-safety.md`; doc tests pass | 12.1 | cc:todo |
+| 12.3 | Bump `Cargo.toml` to `0.3.0`; verify CI matrix green | `clinlat/Cargo.toml` version = `0.3.0`; `cargo test`, `cargo doc --no-deps`, `cargo fmt --check`, `cargo clippy` (no warnings), `cargo check` all green | 12.1, 12.2 | cc:todo |
+| 12.4 | Dry-run publish verification | `cargo publish --dry-run` succeeds without errors from within `clinlat/`; crate package contents verified ready for crates.io | 12.3 | cc:todo |
+
+---
+
 ## Definition of Done for M2
 
 ✓ All M2-anchored SPEC.md elements (DEF-PS-14/15, INV-PS-06, OBL-PS-05) reachable from running code
@@ -101,6 +115,7 @@ The M1 Definition of Done (met, shipped 2026-05-31) and the M1 out-of-scope back
 ✓ INV-PS-06 enforced by structural test (8.6), not argument alone
 ✓ OBL-PS-05 discharged at property-test tier across both reference proposers (11.1)
 ✓ Substrate behavior identical across proposer swap for the same evidence — substrate-first claim demonstrated empirically (11.2, 11.3)
+- [ ] `clinlat-v0.3.0` released: CHANGELOG promoted, `Cargo.toml` bumped, CI matrix green, `cargo publish --dry-run` clean (Phase 12)
 
 ---
 
@@ -113,23 +128,10 @@ claude
 
 **First input:**
 ```
-/harness-work 8.1
+/harness-work 12.1-12.4
 ```
 
-**Rationale:** Phase 8 task 8.1 (`RefinementProposer` trait, DEF-PS-14) is the critical blocker for all M2 work. Both reference proposers depend on it: 9.1 (deterministic lattice search) and 10.1 (LLM-class adapter) each take 8.1 as a dependency. Once the trait and the `ProposerConstraint`/soundness-gate adapters (8.2–8.6) land, the two proposer tracks unblock in parallel, and Phase 11 (OBL-PS-05 discharge + substrate-invariance demonstration) closes the milestone.
-
-Alternatively, if you prefer to work through independent tracks in parallel:
-
-```bash
-ENABLE_PROMPT_CACHING_1H=1 claude
-```
-
-**First input:**
-```
-/breezing all
-```
-
-**Rationale:** Once 8.1 lands, the interface/gate work (8.2–8.6) and the two reference proposers (Phase 9 deterministic, Phase 10 LLM-class) are largely independent and can run concurrently — 9.1 also depends on 4.2 (`apply_set`, already shipped in M1). Phase 11 starts once both proposers exist: 11.1 (OBL-PS-05 discharge) needs the property tests from 9.2 and 10.3, and 11.2 (substrate-invariance) needs 8.5, 9.1, and 10.2.
+**Rationale:** Phases 8–11 (the M2 implementation) are all `cc:done`. The only remaining work before the `clinlat-v0.3.0` tag is Phase 12 (release prep): promote the CHANGELOG entry (12.1), document the proposer examples in README (12.2), bump `Cargo.toml` and verify the CI matrix (12.3), and confirm `cargo publish --dry-run` (12.4). These are sequential (each depends on the prior), so Solo or a small Parallel run is sufficient — Breezing's three-way split isn't needed for 4 tasks. Once Phase 12 is `cc:done`, re-run `/harness-release` to perform the actual tag/PR/GitHub-Release step.
 
 ---
 
