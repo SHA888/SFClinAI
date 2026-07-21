@@ -1,32 +1,20 @@
 # SFClinAI — Plans.md
 
 **Project:** clinlat substrate kernel
-**Current Milestone:** M2 — Constrained refinement proposer (✓ Complete, shipped 2026-07-10)
-**Previous Milestone:** M1 (✓ Complete, shipped 2026-05-31)
+**Current Milestone:** M3 — Institutional substrate kernel (`clinlat-v0.4.0`, cc:TODO — scoped 2026-07-22)
+**Previous Milestone:** M2 (✓ Complete, shipped 2026-07-10)
 **Created:** 2026-05-25
-**Status:** M2 shipped. `clinlat-v0.3.0` tagged (`dcd6226`), GitHub Release published (https://github.com/SHA888/SFClinAI/releases/tag/clinlat-v0.3.0), and published to crates.io.
-**Architectural Scope:** Complete NOTE.md §4A.5 / SPEC.md §2.7 / ARCHITECTURE.md Diagram 3 and 5 patient-substrate proposer slots.
+**Status:** M2 shipped (`clinlat-v0.3.0`, tagged `dcd6226`, live on crates.io). M3 task table generated from `TODO.md`'s M3 roadmap entry; SPEC.md §3 (institutional-state substrate) already formalizes the full scope (DEF-IS-01..15, INV-IS-01..06, OBL-IS-01..06) — **Spec skip reason: no `Spec delta` needed, M3 implements existing SPEC.md §3 formalization**, mirroring how M1 implemented §2 and M2 implemented §2.7.
+**Architectural Scope:** Realize NOTE.md §4B / SPEC.md §3 / ARCHITECTURE.md institutional-substrate nodes in Diagrams 1, 3, 5 (peer structure to the patient substrate per INV-IX-04 — substrate-local soundness independent of coupling).
 
 ---
 
-## Phase 0: Architectural decisions and design docs (archived to docs/archives/ARCHIVE-M1.md)
-
-**Status:** All 3 tasks complete (0.1–0.3) — D1/D2 decisions + M1 provenance spec SSOT.
-**Archive:** See `docs/archives/ARCHIVE-M1.md` for full task table and commits.
-
----
-
-## Phase 1: Ontology infrastructure (M1.1) (archived to docs/archives/ARCHIVE-M1.md)
-
-**Status:** All 8 tasks complete (1.1–1.8) — `OntologyAdapter` trait + SNOMED/RxNorm/LOINC/ICD-11 adapters, `Atom` type replacing `&'static str`, INV-PS-01 closure proof.
-**Archive:** See `docs/archives/ARCHIVE-M1.md` for full task table and commits.
-
----
-
-## Phases 2–7: M1 implementation (archived to docs/archives/ARCHIVE-M1.md)
+## Phases 0–7: M1 implementation (archived to docs/archives/ARCHIVE-M1.md)
 
 All M1 implementation phases are complete and shipped (clinlat v0.1.0 / v0.2.0, 2026-05-31). Full task tables and commits are in `docs/archives/ARCHIVE-M1.md`; bugfix detail in `docs/archives/ARCHIVE-6BF.md`.
 
+- **Phase 0 — Architectural decisions:** D1/D2 decisions + M1 provenance spec SSOT. (0.1–0.3)
+- **Phase 1 — Ontology infrastructure (M1.1):** `OntologyAdapter` trait + SNOMED/RxNorm/LOINC/ICD-11 adapters, `Atom` type replacing `&'static str`, INV-PS-01 closure proof. (1.1–1.8)
 - **Phase 2 — Provenance carrier (M1.2):** typed `Provenance` + `Evidence` carrier, OBL-PS-04 discharge. (2.1–2.4)
 - **Phase 3 — Galois connection (M1.3):** `α_PS`/`γ_PS`, OBL-PS-02 adjunction at property-test tier, INV-PS-01 reconciliation. (3.1–3.7)
 - **Phase 4 — Operator-set formalization (M1.4):** `OperatorSet` (Δ_PS), propagate-forward `apply_set`, OBL-PS-03 discharge. (4.1–4.4)
@@ -40,100 +28,165 @@ The M1 Definition of Done (met, shipped 2026-05-31) and the M1 out-of-scope back
 
 ---
 
-## Phase 8: Proposer interface and soundness gate (M2.1 / M2.2 / M2.3)
+## Phases 8–12: M2 implementation (archived to docs/archives/ARCHIVE-M2.md)
 
-**Goal:** Implement black-box proposer interface per DEF-PS-14 / DEF-PS-15 with input- and output-side ontology gates (M2.1); wire proposer output through the soundness-verification gate with abstention (M2.2); enforce codomain constraint INV-PS-06 by structural test (M2.3).
+All M2 implementation phases are complete and shipped (`clinlat-v0.3.0`, 2026-07-10). Full task tables and commits are in `docs/archives/ARCHIVE-M2.md`.
 
-| Task | Content | DoD | Depends | Status |
-|------|---------|-----|---------|--------|
-| 8.1 | Define `RefinementProposer` trait signature | `pub trait RefinementProposer { fn propose(&self, h: &Hyp, e: &Evidence) -> Set<Hyp>; }` per DEF-PS-14; doc anchors to SPEC.md §2.7; type signature enforces no decision-making (returns candidates only) | 7.4 | cc:done [102a8e9] |
-| 8.2 | Define `ProposerConstraint` validator (input + output gates) | Validates two clauses per DEF-PS-15: (1) candidate must be ontology-bounded (output-side gate); (2) candidate must be at most one operator step from input. Also gates the input side: rejects evidence/hypotheses outside ontology bounds before proposal per M2.1 (Diagram 3 input-side gate). Returns structured error per failed clause for debugging. | 8.1 [tdd:required] | cc:done [9cfdfd3] |
-| 8.3 | Implement `propose_and_filter` adapter | Wrapper that calls proposer and filters output through `ProposerConstraint`. Returns (valid_candidates, filtered_out_count, filter_errors). Logs filtering decisions for audit trail. | 8.2 [tdd:required] | cc:done [78c01f3] |
-| 8.4 | Write INV-PS-06 proof (proposer cannot bypass soundness) | Informal-argument doc `clinlat/docs/invariants/inv-ps-06-proposer-safety.md`; proves that no proposer output can bypass `OperatorSet.apply_set()` gate; worked example: adversarial proposer vs. sound operator | 8.3 | cc:done [cb83a95] |
-| 8.5 | Implement soundness-verification adapter with abstention (M2.2) | `propose_verify` adapter routes constraint-passing candidates through the soundness gate (`OperatorSet.apply_set()`, the Diagram 3 `SV` node); each surviving candidate must be licensed by ≥1 operator. When no candidate is licensed, emits `AbstainReason::NoOperatorLicenses` per DEF-PS-12/13 rather than returning an empty set silently. Audit trail records SV verdicts. | 8.3 [tdd:required] | cc:done [77c954c] |
-| 8.6 | INV-PS-06 structural enforcement test | Dedicated structural test (not the 8.4 argument doc) asserting every path out of `propose_and_filter`/`propose_verify` yields only ontology-bounded candidates: adversarial proposers returning out-of-ontology Hyps are filtered to empty; property tier ≥10 cases over out-of-bounds candidate generators. | 8.2, 8.5 [tdd:required] | cc:done [e1e62a8] |
+- **Phase 8 — Proposer interface and soundness gate (M2.1/M2.2/M2.3):** `RefinementProposer` trait, `ProposerConstraint` gates, `propose_and_filter`/`propose_verify` adapters, INV-PS-06 structural enforcement. (8.1–8.6)
+- **Phase 9 — Deterministic search proposer (M2.4):** `LatticeSearchProposer`, completeness property tests, sepsis-3 worked example. (9.1–9.3)
+- **Phase 10 — LLM-class adapter (M2.5):** `LlmProposer`, safety/robustness property tests, sepsis-3 worked example. (10.1–10.4)
+- **Phase 11 — OBL-PS-05 discharge (M2.6):** discharge doc, substrate-invariance test, substrate-first worked example. (11.1–11.3)
+- **Phase 12 — Integration and release (M2.7):** CHANGELOG, README, `0.3.0` bump, CI green, dry-run publish. (12.0–12.4)
 
----
-
-## Phase 9: Reference proposer #1 — Deterministic search (M2.4)
-
-**Goal:** Implement exhaustive lattice-search proposer; trivially sound by construction (every candidate is demonstrably reachable by an operator).
-
-| Task | Content | DoD | Depends | Status |
-|------|---------|-----|---------|--------|
-| 9.1 | Implement `LatticeSearchProposer` | Exhaustive breadth-first search of all hypotheses reachable from input via single operator application. Returns all valid candidates per DEF-PS-15. For small operator sets (≤5 operators), search terminates quickly; for larger sets, implement pruning heuristics (e.g., halt at depth N or candidate count threshold). | 8.1, 4.2 [tdd:required] | cc:done [7bfdd94] |
-| 9.2 | Property-test `LatticeSearchProposer` completeness | Verify: (1) every hypothesis reachable by one operator application is in the output set; (2) output set is minimal (no spurious candidates); (3) monotonicity of refinement within result set. ≥10 property cases per (1), (2), (3). | 9.1 [tdd:required] | cc:done [0ca7ba8] |
-| 9.2-fix | Code review fixes: refactor property-tier tests | Medium-effort code review identified 6 findings (4 CONFIRMED, 2 PLAUSIBLE): (1) P30 doesn't test identity operator self-loop claim; (2) P23/P27 duplicate (0-refining case); (3) 7 Completeness tests duplicate foundation tier; (4) all 10 Monotonicity tests trivial on Hyp::unknown(); (5) P35 allows Equal but untested; (6) P38 O(n²) loop. Fix: remove 9 duplicates, add 6 new tests for actual gaps (non-unknown input, identity ops), rewrite Monotonicity, fix loop structures. Result: ~27 distinct property cases with genuine coverage. | 9.2 [tdd:required] | cc:done [989883b] |
-| 9.3 | Worked example: SOFA + KDIGO proposer | Use `LatticeSearchProposer` with {SofaRespOperator, KdigoAkiOperator} on a sepsis-3 patient state. Show how lattice search generates candidate refinements (SOFA stage 2 + KDIGO Stage 1, etc.). | 9.2 | cc:done [6bf6e96] |
+The M2 Definition of Done (met, shipped 2026-07-10) is recorded in `docs/archives/ARCHIVE-M2.md`.
 
 ---
 
-## Phase 10: Reference proposer #2 — LLM-class adapter (M2.5)
+## Phase 13: Institutional state space and capacity infrastructure (M3.1)
 
-**Goal:** Wrapper around a foundation-model API call with input/output ontology gates. Demonstrates substrate-first safety: LLM can hallucinate, but system remains sound.
-
-| Task | Content | DoD | Depends | Status |
-|------|---------|-----|---------|--------|
-| 10.1 | Define `LlmProposerConfig` struct | Configuration struct holding: LLM endpoint (OpenAI / Anthropic / local), model name, prompt template, max tokens, temperature, seed for reproducibility. Supports offline mock mode (returns fixed canned responses) for CI/testing. | 8.1 | cc:done [00aa6b6] |
-| 10.2 | Implement `LlmProposer` adapter | Wrapper that (1) constructs a prompt from current hypothesis + evidence, (2) calls LLM API, (3) parses response into candidate hypotheses, (4) runs through `ProposerConstraint` filter. Failed parses or out-of-constraint responses logged as "LLM hallucinations"; ontology gate filters them silently. | 10.1, 8.3 [tdd:required] | cc:done [aa1ad40] |
-| 10.3 | Property-test `LlmProposer` safety invariant | Verify: (1) every LLM-generated candidate that passes `ProposerConstraint` is usable by an operator (safety); (2) LLM can hallucinate freely and the system still refines correctly (robustness); (3) audit trail records LLM responses and filtering decisions. Use mock LLM responses (canned hallucinations, valid-but-non-obvious candidates). | 10.2 [tdd:required] | cc:done [56abd18] |
-| 10.4 | Worked example: Sepsis-3 with LLM proposer | Use `LlmProposer` with mock LLM (pre-recorded responses including hallucinations) on sepsis-3 patient state. Show: (1) LLM suggests a non-existent SOFA band (hallucination filtered), (2) LLM suggests clinically valid KDIGO Stage that passes constraint, (3) substrate refines correctly regardless of LLM behavior. | 10.3 | cc:done [cd25fba] |
-
----
-
-## Phase 11: OBL-PS-05 discharge and substrate-invariance demonstration (M2.6)
-
-**Goal:** Discharge the proposer-constraint obligation OBL-PS-05 at property-test tier across both reference proposers, and demonstrate the substrate-first claim empirically: identical substrate behavior under a proposer swap for the same evidence.
+**Goal:** Implement the institutional-state poset, resource-bounded sets, physical capacity bounds, the institutional event space, and the institutional Galois connection — the structural foundation everything else in M3 builds on. Mirrors Phases 1 and 3 of M1.
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 11.1 | OBL-PS-05 discharge doc | `clinlat/docs/obligations/obl-ps-05-proposer-constraint.md`; discharges OBL-PS-05 at property-test tier; enumerates the property tests from 9.2 and 10.3 as the discharge evidence; states tier (property-test) and residual informal-argument gaps; links DEF-PS-14/15, INV-PS-06 | 9.2, 10.3 | cc:done [190cbe5] |
-| 11.2 | Substrate-invariance test (proposer swap) | Property/integration test feeding the **same** evidence + hypothesis through `LatticeSearchProposer` and `LlmProposer` (mock, returning a superset incl. hallucinations); assert the post-soundness-gate refinement applied by the substrate is **identical** across the swap (substrate behavior independent of proposer architecture per NOTE.md §3, §5). ≥10 paired cases. | 8.5, 9.1, 10.2 [tdd:required] | cc:done [bad9c35] |
-| 11.3 | Worked example: substrate-first claim | Side-by-side worked example (sepsis-3 state) showing both proposers yield the same substrate outcome despite divergent candidate sets; documents the empirical demonstration referenced in the M2 DoD. | 11.2 | cc:done [d033171] |
+| 13.1 | Define `Cap` / `CapacityHypothesis` type and `⊑_IS` poset, `⊤_IS` top element | Per DEF-IS-01/02: `CapacityHypothesis` struct with a partial-order `⊑_IS` ("at least as committed as"); `Cap::top()` constructs `⊤_IS` (fully uncommitted) satisfying `∀c. c ⊑_IS ⊤_IS`. Doc anchors to SPEC.md §3.1. Partial-meet poset structure (MC-1) documented. | 7.4 [tdd:required] | cc:TODO |
+| 13.2 | Implement `compat_IS` predicate | Two capacity hypotheses are compatible iff their union does not exceed any physical bound (forward-references DEF-IS-04; stub `cap` lookup acceptable here, wired fully in 13.5). INV-IS-01 (compatibility under refinement) property test, ≥10 cases. | 13.1 [tdd:required] | cc:TODO |
+| 13.3 | Implement meet `⊓_IS` | Unique most-uncommitted capacity hypothesis at least as committed as both inputs, for compatible pairs, per INV-IS-02. Property test mirroring Phase 3's Galois-connection meet tests. | 13.2 [tdd:required] | cc:TODO |
+| 13.4 | Define `ResourceBoundedSet` / `Resource` enumeration | Per DEF-IS-03: institutional analog of `OntologyBoundedSet` (DEF-PS-03) covering physical resource units (beds, ICU bays, OR rooms, ventilators), consumable classes (formulary, reagents), time-divisible slots (lab queue, OR block hours), personnel role assignments. Each resource carries a version identifier and source attribution. OBL-IS-02 (resource decidability) test: free-form resource identifiers rejected at construction. | 13.1 [tdd:required] | cc:TODO |
+| 13.5 | Implement physical capacity bound `cap: R → ℕ ∪ {∞}` | Per DEF-IS-04: versioned function (`ver(cap): Ver`) giving max simultaneous instances per resource; `is_physically_valid(c: &CapacityHypothesis) -> bool` checks committed-resource count per `r ∈ R` does not exceed `cap(r)`. Wire into 13.2's `compat_IS` (remove stub). | 13.4 [tdd:required] | cc:TODO |
+| 13.6 | Define institutional event space `Evt_IS` | Per DEF-IS-05: poset of timestamped, provenance-tagged operational events (admissions, discharges, transfers, supply deliveries, shift changes, allocation requests/releases); `e₁ ⊑_Evt e₂` iff `e₁`'s event multiset ⊇ `e₂`'s. Doc anchor to SPEC.md §3.3. | 13.1 | cc:TODO |
+| 13.7 | Implement institutional Galois connection `(α_IS, γ_IS)` | Per DEF-IS-06: `α_IS: Evt → Cap` (event history → most-committed hypothesis it entails), `γ_IS: Cap → Evt` (hypothesis → consistent event histories), satisfying DEF-MP-08. OBL-IS-03 (adjunction soundness) property test: `∀e,c. α_IS(e) ⊑_IS c ⟺ e ⊑_Evt γ_IS(c)`, ≥15 cases mirroring Phase 3's OBL-PS-02 discharge. | 13.3, 13.5, 13.6 [tdd:required] | cc:TODO |
 
 ---
 
-## Phase 12: Integration and release (M2.7)
+## Phase 14: Capacity-update operators (M3.2)
 
-**Goal:** Same shape as M1's Phase 7 — promote the M2 implementation (Phases 8–11) into a documented, version-bumped, publish-verified crate state ready for the `clinlat-v0.3.0` tag. `/harness-release` performs the actual tag/PR/GitHub-Release step once this phase is `cc:done`; this phase only prepares the artifact.
+**Goal:** Define the capacity-update operator signature and operator-set formalization, then implement the four concrete operators named in `TODO.md`'s M3.2. Mirrors Phase 4 (operator-set formalization) and Phase 5 (concrete operators) of M1.
 
 | Task | Content | DoD | Depends | Status |
 |------|---------|-----|---------|--------|
-| 12.0 | Fix pre-existing `prop_abstraction_completeness` test bug (blocks 12.3's "cargo test green" DoD) | `operator.rs`'s `prop_abstraction_completeness` asserted `hyp.atoms().len() == codes.len()`, but `Hyp::new` deduplicates atoms by full equality (poset invariant); duplicate generated observation codes (e.g. `["ICD11:498","ICD11:498"]`) parse to identical atoms that collapse to one, so the naive count assertion is false whenever the proptest strategy generates a duplicate. Fixed by comparing against the distinct-code count instead. Unrelated to M2 scope — pre-existing, confirmed via `git stash` isolation 2026-07-03 (see harness-mem M2 status note). All 299 tests pass after fix. | none | cc:done [1c68ecf] |
-| 12.1 | Write real `[0.3.0]` CHANGELOG entry | Replace `clinlat/CHANGELOG.md`'s `[Unreleased] → Planned for 0.3.0` bullets with a dated `## [0.3.0]` section in Keep-a-Changelog `### Added` style (matching the `[0.2.0]` entry's structure), covering: `RefinementProposer` trait (DEF-PS-14), `ProposerConstraint` gates (DEF-PS-15), `propose_and_filter`/`propose_verify` adapters, INV-PS-06 structural enforcement, `LatticeSearchProposer`, `LlmProposer`, OBL-PS-05 discharge, and the three worked examples (9.3, 10.4, 11.3); links to the relevant `docs/obligations/` and `docs/invariants/` files | 11.1, 11.2, 11.3 | cc:done [9f05aae] |
-| 12.2 | Update `clinlat/README.md` with M2 examples | Add a proposer usage example (`LatticeSearchProposer` and/or `LlmProposer` against `propose_verify`) alongside the existing M1 operator examples; update crate status/milestone section to reflect M2; cross-links to `docs/obligations/obl-ps-05-proposer-constraint.md` and `docs/invariants/inv-ps-06-proposer-safety.md`; doc tests pass | 12.1 | cc:done [edd1aca] |
-| 12.3 | Bump `Cargo.toml` to `0.3.0`; verify CI matrix green | `clinlat/Cargo.toml` version = `0.3.0`; `cargo test`, `cargo doc --no-deps`, `cargo fmt --check`, `cargo clippy` (no warnings), `cargo check` all green | 12.1, 12.2 | cc:done [f004918] |
-| 12.4 | Dry-run publish verification | `cargo publish --dry-run` succeeds without errors from within `clinlat/`; crate package contents verified ready for crates.io | 12.3 | cc:done [verified] |
+| 14.1 | Define `CapacityUpdateOperator` trait signature | Per DEF-IS-07: `fn apply(&self, c: &Cap, e: &InstEvidence) -> Result<Cap, AbstainReason_IS>` (forward-declares `InstEvidence` per Phase 16, `AbstainReason_IS` per Phase 15 — stub types acceptable, refined in those phases). Doc anchor to SPEC.md §3.4. | 13.7 | cc:TODO |
+| 14.2 | Implement `InstitutionalOperatorSet` (`Δ_IS`) | Per DEF-IS-09: finite, named, versioned set of operators, mirroring `OperatorSet` (Phase 4) structure and its `apply_set` propagate-forward semantics. | 14.1 [tdd:required] | cc:TODO |
+| 14.3 | ICU/HDU bed admit/discharge/transfer operator | Sound per DEF-IS-08 (refines-only, bounded by `α_IS(evt)`, physically valid per OBL-IS-01); ≥8 unit tests covering admit, discharge, transfer, and a capacity-exceeded case that must abstain rather than violate `cap`. | 14.2 [tdd:required] | cc:TODO |
+| 14.4 | OR/infusion-chair slot allocation operator | Same soundness discipline as 14.3, applied to OR block hours / infusion-chair time-divisible slots. ≥8 unit tests. | 14.2 [tdd:required] | cc:TODO |
+| 14.5 | Pharmacy inventory dispense/restock operator | Same soundness discipline, applied to formulary consumable classes (dispense decrements, restock increments, bounded by `cap`). ≥8 unit tests. | 14.2 [tdd:required] | cc:TODO |
+| 14.6 | Blood-product allocation operator | Same soundness discipline, applied to blood-product units (a consumable resource with expiry — document expiry handling as out-of-scope per §0.5 if not modeled, or model it if trivial). ≥8 unit tests. | 14.2 [tdd:required] | cc:TODO |
+| 14.7 | INV-IS-03 monotonicity property test + OBL-IS-04 discharge doc | Property test across all four operators (14.3–14.6): `δ_IS(c,e) = Refined(c') ⟹ c' ⊑_IS c`, ≥10 cases per operator. `clinlat/docs/obligations/obl-is-04-operator-set-soundness.md` discharging OBL-IS-04 at property-test tier, enumerating the four operators as evidence. | 14.3, 14.4, 14.5, 14.6 [tdd:required] | cc:TODO |
 
 ---
 
-## Definition of Done for M2
+## Phase 15: Allocation abstention (M3.3)
 
-✓ All M2-anchored SPEC.md elements (DEF-PS-14/15, INV-PS-06, OBL-PS-05) reachable from running code
-✓ Diagram 3 boundary contract realized end-to-end: input gate → proposer → output gate → soundness-verification (`SV`) node → abstention path (8.1–8.6)
-✓ Diagram 5 patient-side proposer slot `RP` filled by ≥2 architectures: deterministic lattice search (Phase 9) and LLM-class adapter (Phase 10)
-✓ INV-PS-06 enforced by structural test (8.6), not argument alone
-✓ OBL-PS-05 discharged at property-test tier across both reference proposers (11.1)
-✓ Substrate behavior identical across proposer swap for the same evidence — substrate-first claim demonstrated empirically (11.2, 11.3)
-✓ `clinlat-v0.3.0` released: CHANGELOG promoted, `Cargo.toml` bumped, CI matrix green (299 tests, fmt, clippy, doc), `cargo publish --dry-run` clean (Phase 12) — then tagged (`dcd6226`), GitHub Release published, and published to crates.io (2026-07-10)
+**Goal:** Implement institution-specific abstention reasons and wire them through the operator-set application path with a bounded-steps guarantee. Mirrors the abstention half of Phase 8 (M2.2) but for the institutional side.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 15.1 | Define `AbstainReason_IS` enum | Per DEF-IS-10, all six variants: `CapacityExceeded`, `DemandUncertain`, `AllocationContested`, `EventOutOfScope`, `OperatorPreconditionUnmet`, `PhysicalValidityWouldBeViolated`. Every variant machine-classifiable (no free-text reason fields). Replaces the stub type used in 14.1. | 13.4, 14.1 | cc:TODO |
+| 15.2 | Wire abstention into `InstitutionalOperatorSet::apply_set` | When no operator in `Δ_IS` licenses a refinement, emit the appropriate `AbstainReason_IS` variant (not a silent empty result). INV-IS-04 (institutional abstention is sound) property test mirroring INV-PS-04's discharge, ≥10 cases. | 14.2, 15.1 [tdd:required] | cc:TODO |
+| 15.3 | DEF-IS-11 bounded-steps structural test | Structural test asserting every allocation request through `apply_set` yields `Refined(c')` or `Abstain(r)` in bounded steps — never silent failure, timeout, or crash-as-default. Adversarial cases: contested allocation, out-of-scope event, precondition unmet. ≥8 cases. | 15.2 [tdd:required] | cc:TODO |
+
+---
+
+## Phase 16: Institutional provenance ledger (M3.4)
+
+**Goal:** Extend the patient-substrate provenance machinery (Phase 2) to the institutional side, including the auditability requirement that the ledger spans multiple patients (institution-wide), not a per-patient sequence.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 16.1 | Define `InstEvidence` provenance-carrying evidence type | Per DEF-IS-12: `InstEvidence = Evt^P` — mirrors `Evidence`/`Provenance` from Phase 2, every institutional event carries provenance. Replaces the stub type used in 14.1/15.1. | 14.1, 15.1 | cc:TODO |
+| 16.2 | Define provenance-carrying operator output `Cap^P` | Per DEF-IS-13: `δ_IS : Cap^P × InstEvidence → Result⟨Cap^P, AbstainReason_IS⟩^P`. Update `InstitutionalOperatorSet::apply_set` signature accordingly. | 16.1, 14.2 [tdd:required] | cc:TODO |
+| 16.3 | INV-IS-05 provenance closure test | Property test mirroring INV-PS-05's discharge: every `Cap^P` produced by an operator has a provenance chain closed over its input evidence, ≥10 cases. | 16.2 [tdd:required] | cc:TODO |
+| 16.4 | OBL-IS-05 provenance auditability discharge doc | `clinlat/docs/obligations/obl-is-05-provenance-auditability.md`; documents that the institutional ledger records capacity decisions **spanning patients** (institution-wide, versus the per-patient sequence of Phase 2), per `NOTE.md` §4B.4; discharge tier: informal-argument + the 16.3 property tests as evidence. | 16.3 | cc:TODO |
+
+---
+
+## Phase 17: Capacity-learned proposer interface (M3.5)
+
+**Goal:** Institutional analog of Phase 8/9 — a black-box proposer interface with input/output ontology gates, wired through the soundness gate, plus a stub demand-forecasting reference proposer. Mirrors M2's Phase 8 (interface) and Phase 9 (deterministic reference proposer) exactly, substituting `IS` for `PS`.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 17.1 | Define `CapacityProposer` trait signature | Per DEF-IS-14: `pub trait CapacityProposer { fn propose(&self, c: &Cap, e: &InstEvidence) -> Set<Cap>; }`. Doc anchor to SPEC.md §3.7; type signature enforces no decision-making. | 16.2 | cc:TODO |
+| 17.2 | Define `ProposerConstraint_IS` validator | Per DEF-IS-15, three clauses: (1) resource-boundedness (DEF-IS-03), (2) physical validity under current `cap` (DEF-IS-04), (3) at-most-one-step refinement under `⊑_IS` (analogous to DEF-PS-15.2). Structured error per failed clause. | 17.1, 13.5 [tdd:required] | cc:TODO |
+| 17.3 | Implement `propose_and_filter_is` / `propose_verify_is` adapters | Mirrors Phase 8's `propose_and_filter`/`propose_verify` (tasks 8.3/8.5): filters proposer output through `ProposerConstraint_IS`, then routes surviving candidates through `InstitutionalOperatorSet::apply_set` (the institutional `SV` node); emits `AbstainReason_IS::OperatorPreconditionUnmet` (or equivalent) when nothing is licensed, never silently. | 17.2, 15.2 [tdd:required] | cc:TODO |
+| 17.4 | INV-IS-06 structural enforcement test | Per DEF-IS-06 pattern (Phase 8.6 analog): adversarial `CapacityProposer` returning out-of-resource-bounds or physically-invalid candidates is filtered to empty at every path out of `propose_and_filter_is`/`propose_verify_is`. Property tier ≥10 cases. | 17.2, 17.3 [tdd:required] | cc:TODO |
+| 17.5 | Stub demand-forecasting reference proposer | `DemandForecastProposer`: a mock/stub implementation (canned or simple heuristic forecast — no real ML model required, matching `LlmProposer`'s offline-mock pattern from Phase 10) satisfying `CapacityProposer`, generating candidate bed/slot reallocations from a demand signal. | 17.1, 17.3 | cc:TODO |
+| 17.6 | OBL-IS-06 discharge doc | `clinlat/docs/obligations/obl-is-06-proposer-operator-separation.md`; mirrors OBL-PS-05's discharge (Phase 11.1); enumerates the 17.4 property tests as evidence; states discharge tier. | 17.4, 17.5 | cc:TODO |
+
+---
+
+## Phase 18: Worked example and discharge-tier upgrade (M3.6)
+
+**Goal:** One capacity-update operator (ICU bed admit/discharge, per `TODO.md` M3.6) taken to a worked example at informal-argument tier minimum, property-test tier as the target — mirroring M1's Phase 5→6 progression (operator, then discharge-tier upgrade).
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 18.1 | ICU bed admit/discharge worked example | Worked example (mirrors 9.3/10.4/11.3 shape) using the 14.3 operator on a concrete institutional scenario: patient admission request against a near-capacity ICU, showing `Refined`/`Abstain(CapacityExceeded)` paths. Informal-argument soundness doc `clinlat/docs/operators/icu_bed_soundness.md` (mirrors `sofa_resp_soundness.md`'s original informal-argument tier). | 14.7, 15.3 | cc:TODO |
+| 18.2 | Property-test tier upgrade for ICU bed operator | Mirrors Phase 6 (M1.6): upgrade the 14.3 operator's discharge from informal-argument → property-test tier; ≥15 new property-test cases; refresh `icu_bed_soundness.md` documenting total test count. | 18.1 [tdd:required] | cc:TODO |
+
+---
+
+## Phase 19: Integration and release (M3.7)
+
+**Goal:** Same shape as M1's Phase 7 and M2's Phase 12 — promote Phases 13–18 into a documented, version-bumped, publish-verified crate state ready for the `clinlat-v0.4.0` tag. `/harness-release` performs the actual tag/PR/GitHub-Release step once this phase is `cc:done`.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| 19.1 | Write real `[0.4.0]` CHANGELOG entry | `clinlat/CHANGELOG.md` `## [0.4.0]` section in Keep-a-Changelog style, covering: institutional state space (DEF-IS-01/02), resource bounds (DEF-IS-03/04), Galois connection (DEF-IS-06), four capacity-update operators (DEF-IS-07/08/09), allocation abstention (DEF-IS-10/11), provenance (DEF-IS-12/13), capacity-learned proposer (DEF-IS-14/15), and the ICU bed worked example; links to `docs/obligations/` and `docs/operators/`. | 16.4, 17.6, 18.2 | cc:TODO |
+| 19.2 | Update `clinlat/README.md` with M3 examples | Add institutional-substrate usage example (capacity-update operator + `propose_verify_is`) alongside existing M1/M2 examples; update crate status/milestone section to reflect M3; cross-links to the new obligation docs; doc tests pass. | 19.1 | cc:TODO |
+| 19.3 | Bump `Cargo.toml` to `0.4.0`; verify CI matrix green | `clinlat/Cargo.toml` version = `0.4.0`; `cargo test`, `cargo doc --no-deps`, `cargo fmt --check`, `cargo clippy` (no warnings), `cargo check` all green. | 19.1, 19.2 | cc:TODO |
+| 19.4 | Dry-run publish verification | `cargo publish --dry-run` succeeds without errors from within `clinlat/`; crate package contents verified ready for crates.io. | 19.3 | cc:TODO |
+
+---
+
+## Definition of Done for M3
+
+- [ ] All ten M3-anchored SPEC.md elements reachable from running code: DEF-IS-01..15, INV-IS-01..06, OBL-IS-01..06
+- [ ] Institutional substrate exists as a peer structure to the patient substrate per INV-IX-04 (substrate-local soundness independent of coupling) — no institutional definition silently depends on patient-substrate internals
+- [ ] Four capacity-update operators implemented and OBL-IS-04-discharged: ICU/HDU bed, OR/infusion-chair slots, pharmacy inventory, blood-product allocation (Phase 14)
+- [ ] Allocation abstention (`AbstainReason_IS`, 6 variants) wired through the operator-set application path with INV-IS-04 soundness and DEF-IS-11 bounded-steps guarantees (Phase 15)
+- [ ] Institutional provenance ledger spans patients (institution-wide), OBL-IS-05 discharged (Phase 16)
+- [ ] Capacity-learned proposer interface (Diagram 5 institutional-side `RP` slot) filled by ≥1 reference proposer (stub demand-forecaster), INV-IS-06 enforced structurally, OBL-IS-06 discharged (Phase 17)
+- [ ] ICU bed operator taken to property-test tier via worked example (Phase 18)
+- [ ] `clinlat-v0.4.0` released: CHANGELOG promoted, `Cargo.toml` bumped, CI matrix green, `cargo publish --dry-run` clean (Phase 19)
+
+---
+
+## Definition of Done for M2 (met — see `docs/archives/ARCHIVE-M2.md`)
+
+✓ `clinlat-v0.3.0` released 2026-07-10: tagged (`dcd6226`), GitHub Release published, live on crates.io. Full DoD checklist archived.
+
+---
+
+## Backlog: Wells PE operator hardening (non-blocking, surfaced 2026-07-22)
+
+**Context:** Found while writing `clinlat/docs/operators/wells_pe_soundness.md` (M1 Phase 5 operator, already shipped). None block M3; pick up whenever, or fold into a future M1-hardening pass.
+
+| Task | Content | DoD | Depends | Status |
+|------|---------|-----|---------|--------|
+| WP.1 | Resolve undocumented Wells PE abstention paths | `WellsPeOperator`'s doc comment (`wells_pe.rs`) claims abstention on "D-dimer unavailable" and "CTPA contraindicated," but `apply()` only implements the missing-gestalt abstention. Either (a) implement both as explicit preconditions with dedicated `AbstainReason` variants and tests, or (b) correct the doc comment to drop the unimplemented claims and update `wells_pe_soundness.md` Limitation 2 accordingly. | none | cc:TODO |
+| WP.2 | Carry Wells PE sequential-testing next-step into operator output | `apply()` computes a next-step signal (`"consider-d-dimer"` / `"ctpa-indicated"`) and discards it (`_next_step`). Encode it in the output (second Atom, structured field, or provenance annotation) so NOTE.md §7E.3's sequential-testing recommendation is recoverable from the Evidence/Hyp chain, not only from the category-to-next-step convention documented in prose. Existing 8 unit tests stay green; ≥1 new test asserts the next-step value is present in the output. | none | cc:TODO |
+| WP.3 | Resolve `PE-LIKELY` naming overlap (gestalt input vs. category output) | The `"PE-LIKELY"` observation code (mandatory gestalt input) and the `PE-LIKELY` output category label (score >4.0) share a name but denote different things. Either rename the output atom codes to unambiguous identifiers (e.g. `WELLS-PE-LOW-RISK`/`WELLS-PE-HIGH-RISK`, updating existing tests) or add an explicit doc-comment cross-reference at both call sites in `wells_pe.rs`; update `wells_pe_soundness.md` Limitation 3 to match whichever is chosen. | none | cc:TODO |
+| WP.4 | Fix Wells PE test-comment arithmetic and name precision | `test_wells_pe_all_criteria`'s comment says the all-criteria sum is "12.0"; actual sum is 12.5 (3+3+1.5+1.5+1.5+1+1) — fix the comment. `test_wells_pe_unlikely_with_dvt_signs` asserts a `PE-LIKELY` outcome (score 4.5), not "unlikely" — rename or fix its comment per CLAUDE.md's "Test comment precision" discipline. `cargo test -p clinlat` green after the rename. | none | cc:TODO |
 
 ---
 
 ## Next session startup
 
-**M2 is fully shipped** (`clinlat-v0.3.0`: tagged, GitHub Release published, live on crates.io as of 2026-07-10). There is no open task in this file — Phases 8–12 are all `cc:done`.
+**M3 task table generated 2026-07-22** (this session), scoped from `TODO.md`'s M3 entry against SPEC.md §3 (already fully formalized — no `Spec delta` needed). All 30 tasks across Phases 13–19 are `cc:TODO`; none started.
 
 **New session command:**
 ```bash
 claude
 ```
 
-**First input:** none required yet. The next unit of work is scoping **M3 — Institutional substrate kernel** (`clinlat-v0.4.0` per `TODO.md`), which has no `Plans.md` task table yet. Start a new session with something like `/harness-plan M3` or discuss scope first — NOTE.md §4B (institutional-state substrate) and SPEC.md §3 are the source material, mirroring how M2 mirrored §4A/§2.
+**First input:** `/harness-work 13.1` to start the dependency root (institutional-state poset), or `/harness-work all` to let the harness auto-select Breezing mode across the full M3 backlog. Phase 13 (state-space infrastructure) must complete before Phases 14–17 can begin — see each phase's `Depends` column.
 
 ---
 
 ## Notes on discipline
 
-- **TDD adoption:** All M2 implementation tasks (8.2, 8.3, 8.5, 8.6, 9.1, 9.2, 10.2, 10.3, 11.2) are marked `[tdd:required]`. Write failing tests first.
-- **Soundness discharge:** Tasks 8.4 (INV-PS-06 proof) and 11.1 (OBL-PS-05 discharge) are pure documentation; the three worked examples (9.3, 10.4, 11.3) are demonstrative. These constitute the informal-argument and property-test tier discharges per SPEC.md §6.
-- **Critical gate:** Task 8.1 (`RefinementProposer` trait) must complete before any other M2 phase; it is the dependency root for both reference proposers and the soundness-verification adapter.
+- **TDD adoption (M3):** Nearly all M3 implementation tasks are marked `[tdd:required]` — write failing tests first. Pure-doc tasks (13.6, 16.1, 16.4, 17.6, 19.1, 19.2) and worked-example tasks (18.1) are exempt by nature.
+- **Critical gate (M3):** Task 13.1 (`Cap`/`⊑_IS` poset) is the dependency root for all of Phases 13–19; nothing else in M3 can start before it.
+- **Structural asymmetry (M3):** Unlike the patient substrate, the institutional substrate is subject to hard physical capacity bounds (DEF-IS-04) with no patient-side analog — this surfaces as the `PhysicalValidityWouldBeViolated` abstention variant (15.1) and `OBL-IS-01` (physical-validity preservation), which have no `PS`-side counterpart.
+- **Peer-substrate invariant:** Per `INV-IX-04`, the institutional substrate must remain sound independent of coupling to the patient substrate — M3 tasks should not introduce silent dependencies on `PS`-side internals beyond the shared `§1` abstractions (`Hyp`-poset machinery reused structurally, not by reference).
+- **Prior milestones:** M1 discipline notes are in `docs/archives/ARCHIVE-M1.md`; M2 discipline notes are in `docs/archives/ARCHIVE-M2.md`.
